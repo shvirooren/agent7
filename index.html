@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 7 — מערכת משימות AI</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<style>
+:root{--bd:#003366;--bm:#0055A4;--bl:#0077CC;--ba:#009FE3;--bp:#E8F4FC;--gl:#F5F7FA;--gm:#E2E8EF;--gt:#5A6A7A;--td:#1A2B3C;--gr:#16A34A;--gp:#DCFCE7;--rd:#DC2626;--rp:#FEE2E2;--or:#D97706;--op:#FEF3C7}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{font-family:'Heebo',sans-serif;background:#fff;color:var(--td);direction:rtl}
+nav{background:#0A0F1E;border-bottom:1px solid #0D2545;padding:0 40px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100}
+.nav-actions{display:flex;align-items:center;gap:10px}
+.logo{display:flex;align-items:center;gap:10px;text-decoration:none}
+.lic{width:34px;height:34px;background:linear-gradient(135deg,var(--bm),var(--ba));border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:900;color:#fff}
+.ltx{font-size:17px;font-weight:800;color:#fff;letter-spacing:1px}
+.ltx span{color:var(--ba)}
+.nav-links{display:flex;align-items:center;gap:8px}
+.nav-links a{color:var(--ba);text-decoration:none;font-size:14px;font-weight:500;padding:7px 16px;border-radius:4px;transition:all .15s}
+.nav-links a:hover{color:#fff;background:rgba(0,119,204,.2)}
+.btn-login{background:var(--bm);color:#fff;font-weight:700;border-radius:5px;border:1px solid var(--ba);padding:7px 16px;font-size:14px;text-decoration:none;transition:all .2s}
+.btn-login:hover{background:var(--bd)}
+.hero{background:linear-gradient(160deg,var(--bd) 0%,var(--bm) 60%,var(--bl) 100%);padding:80px 20px;text-align:center;color:#fff}
+.hero-tag{display:inline-flex;align-items:center;gap:8px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);padding:6px 16px;border-radius:100px;font-size:12px;font-weight:600;color:rgba(255,255,255,.9);margin-bottom:28px}
+.hero-dot{width:6px;height:6px;background:var(--ba);border-radius:50%;animation:blink 2s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+.hero h1{font-size:clamp(36px,6vw,68px);font-weight:900;line-height:1.1;margin-bottom:20px;letter-spacing:-1px}
+.hero h1 em{font-style:normal;color:var(--ba)}
+.hero p{font-size:17px;color:rgba(255,255,255,.8);max-width:520px;margin:0 auto 36px;line-height:1.7}
+.hero-cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-bottom:56px}
+.btn-primary{background:#fff;color:var(--bm);padding:13px 30px;border-radius:5px;font-size:15px;font-weight:700;text-decoration:none;transition:all .2s}
+.btn-primary:hover{background:var(--bp);transform:translateY(-1px)}
+.btn-secondary{background:rgba(255,255,255,.1);color:#fff;padding:13px 30px;border-radius:5px;font-size:15px;font-weight:600;text-decoration:none;border:1.5px solid rgba(255,255,255,.3);transition:all .2s}
+.btn-secondary:hover{background:rgba(255,255,255,.2)}
+.nav-pres{background:var(--bm)!important;color:#fff!important;font-weight:700!important;border-radius:5px!important;border:1px solid var(--ba)!important;padding:7px 16px!important;font-size:14px!important}
+.nav-pres:hover{background:var(--bd)!important}
+.hero-mockup{max-width:720px;margin:0 auto;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 40px 80px rgba(0,0,0,.3)}
+.mockup-bar{background:var(--gl);padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--gm)}
+.mockup-dots{display:flex;gap:5px}
+.mockup-dot{width:10px;height:10px;border-radius:50%}
+.d1{background:#FF5F57}.d2{background:#FFBD2E}.d3{background:#28CA42}
+.mockup-url{font-size:11px;color:var(--gt);margin:0 auto;background:#fff;padding:3px 12px;border-radius:3px;border:1px solid var(--gm)}
+.mockup-body{padding:16px}
+.mockup-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.mockup-title{font-size:13px;font-weight:700;color:var(--td)}
+.ai-badge{display:flex;align-items:center;gap:5px;background:var(--bp);padding:3px 10px;border-radius:100px;font-size:11px;color:var(--bm);font-weight:600;border:1px solid var(--gm)}
+.task-row{display:flex;align-items:center;gap:10px;padding:9px 12px;border:1px solid var(--gm);border-radius:5px;margin-bottom:7px}
+.task-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.task-name{font-size:12px;font-weight:600;color:var(--td)}
+.task-desc-m{font-size:11px;color:var(--gt)}
+.status-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.s-open{background:var(--rd)}.s-progress{background:var(--or)}.s-done{background:var(--gr)}
+.priority-tag{font-size:10px;font-weight:700;padding:2px 8px;border-radius:2px}
+.p-high{background:var(--rp);color:var(--rd)}.p-med{background:var(--op);color:var(--or)}.p-low{background:var(--gp);color:var(--gr)}
+.stats{background:var(--gl);border-top:1px solid var(--gm);border-bottom:1px solid var(--gm)}
+.stats-inner{max-width:900px;margin:0 auto;display:grid;grid-template-columns:repeat(3,1fr)}
+.stat{padding:32px;text-align:center;border-left:1px solid var(--gm)}
+.stat:last-child{border-left:none}
+.stat-num{font-size:42px;font-weight:900;color:var(--bm);display:block;margin-bottom:6px}
+.stat-label{font-size:14px;color:var(--gt)}
+.features{padding:80px 20px;max-width:1000px;margin:0 auto}
+.section-tag{font-size:12px;font-weight:700;color:var(--bm);letter-spacing:1.5px;text-transform:uppercase;margin-bottom:10px}
+.section-title{font-size:clamp(26px,4vw,42px);font-weight:900;margin-bottom:48px;color:var(--bd)}
+.features-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:1px;background:var(--gm);border:1px solid var(--gm);border-radius:8px;overflow:hidden}
+.feature{background:#fff;padding:32px;transition:background .15s}
+.feature:hover{background:var(--gl)}
+.feature-icon{font-size:28px;margin-bottom:14px;display:block}
+.feature h3{font-size:16px;font-weight:700;margin-bottom:8px;color:var(--td)}
+.feature p{font-size:13.5px;color:var(--gt);line-height:1.7}
+.how{background:var(--gl);border-top:1px solid var(--gm);border-bottom:1px solid var(--gm);padding:80px 20px}
+.how-inner{max-width:900px;margin:0 auto}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:32px;margin-top:48px}
+.step{text-align:center}
+.step-num{width:44px;height:44px;background:var(--bp);border:1.5px solid var(--bm);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;color:var(--bm);margin:0 auto 16px}
+.step h3{font-size:15px;font-weight:700;margin-bottom:8px;color:var(--td)}
+.step p{font-size:13px;color:var(--gt);line-height:1.7}
+.cta{padding:80px 20px;text-align:center;background:linear-gradient(160deg,var(--bd),var(--bm))}
+.cta h2{font-size:clamp(28px,4vw,48px);font-weight:900;color:#fff;margin-bottom:16px}
+.cta p{font-size:16px;color:rgba(255,255,255,.75);margin-bottom:36px}
+.cta-buttons{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+footer{background:#0A0F1E;border-top:1px solid #0D2545;padding:24px 40px;display:flex;align-items:center;justify-content:space-between}
+.footer-logo{font-size:13px;color:#fff;font-weight:600}
+.footer-logo span{color:#fff}
+.footer-links{display:flex;gap:20px}
+.footer-links a{font-size:13px;color:var(--gt);text-decoration:none}
+.footer-links a:hover{color:var(--bm)}
+.btn-contact{background:var(--ba);color:#fff;font-weight:700;border-radius:5px;border:none;padding:7px 16px;font-size:14px;cursor:pointer;transition:all .2s;font-family:'Heebo',sans-serif}
+.btn-contact:hover{background:var(--bl)}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:999;align-items:center;justify-content:center}
+.modal-overlay.open{display:flex}
+.modal{background:#fff;border-radius:10px;padding:36px;width:100%;max-width:460px;position:relative;direction:rtl}
+.modal h2{font-size:22px;font-weight:900;color:var(--bd);margin-bottom:6px}
+.modal p{font-size:13px;color:var(--gt);margin-bottom:24px}
+.modal-close{position:absolute;top:14px;left:16px;background:none;border:none;font-size:22px;cursor:pointer;color:var(--gt);line-height:1}
+.form-group{margin-bottom:16px}
+.form-group label{display:block;font-size:13px;font-weight:600;color:var(--td);margin-bottom:5px}
+.form-group input,.form-group textarea{width:100%;padding:10px 12px;border:1.5px solid var(--gm);border-radius:5px;font-size:14px;font-family:'Heebo',sans-serif;outline:none;transition:border .15s}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--bm)}
+.form-group textarea{resize:vertical;min-height:90px}
+.btn-submit{width:100%;background:var(--bm);color:#fff;border:none;padding:12px;border-radius:5px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;transition:background .2s}
+.btn-submit:hover{background:var(--bd)}
+@media(max-width:768px){
+  nav{padding:0 16px}
+  .nav-links a:not(.btn-login){display:none}
+  .features-grid{grid-template-columns:1fr}
+  .steps{grid-template-columns:1fr;gap:20px}
+  .stats-inner{grid-template-columns:1fr}
+  .stat{border-left:none;border-bottom:1px solid var(--gm)}
+  footer{flex-direction:column;gap:12px;text-align:center}
+  .hero{padding:60px 16px}
+}
+@media(max-width:480px){
+  .stat{padding:20px 16px}
+  .stat-num{font-size:32px}
+  .hero-buttons .btn-primary,.hero-buttons .btn-outline{width:100%;justify-content:center}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="#" class="logo">
+    <div class="lic">A7</div>
+    <div class="ltx">AGENT <span>7</span></div>
+  </a>
+  <div class="nav-actions">
+    <button class="btn-contact" onclick="document.getElementById('contactModal').classList.add('open')">✉️ צור קשר</button>
+    <a href="presentation.html" class="btn-secondary nav-pres">📊 מצגת ללקוח</a>
+    <a href="login.html" class="btn-login">כניסה למערכת</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-tag"><div class="hero-dot"></div> מערכת ניהול משימות חכמה</div>
+  <h1>ניהול משימות<br><em>חכם ואוטומטי</em></h1>
+  <p>Agent 7 מחלק משימות לעובדים בזמן אמת — כל עובד רואה רק את המשימות שלו, בלי הדרכה, בלי בלגן.</p>
+  <div class="hero-cta">
+    <a href="login.html" class="btn-primary">כניסה למערכת</a>
+    <a href="presentation.html" class="btn-secondary">📊 מצגת ללקוח</a>
+  </div>
+  <svg width="100%" viewBox="0 0 600 300" xmlns="http://www.w3.org/2000/svg" style="max-width:680px;display:block;margin:0 auto;border-radius:14px;filter:drop-shadow(0 32px 60px rgba(0,0,0,.4))">
+    <defs>
+      <radialGradient id="glowA7" cx="50%" cy="50%" r="50%">
+        <stop offset="0%" stop-color="#534AB7" stop-opacity="0.5"/>
+        <stop offset="100%" stop-color="#534AB7" stop-opacity="0"/>
+      </radialGradient>
+    </defs>
+    <rect width="600" height="300" rx="14" fill="#0A0F1E"/>
+    <pattern id="dots" x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse"><circle cx="12" cy="12" r="1" fill="#4A5A8A" opacity="0.4"/></pattern>
+    <rect width="600" height="300" fill="url(#dots)" rx="14"/>
+
+    <!-- זוהר מסביב ל-A7 -->
+    <circle cx="300" cy="150" r="120" fill="url(#glowA7)"/>
+
+    <!-- קווי חיבור -->
+    <line x1="240" y1="138" x2="118" y2="88"  stroke="#534AB7" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+    <line x1="300" y1="108" x2="300" y2="42"   stroke="#534AB7" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+    <line x1="360" y1="138" x2="482" y2="88"  stroke="#534AB7" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+    <line x1="360" y1="162" x2="482" y2="212" stroke="#534AB7" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+    <line x1="240" y1="162" x2="118" y2="212" stroke="#534AB7" stroke-width="1" stroke-dasharray="4 4" opacity="0.6"/>
+
+    <!-- ══ Agent 7 — מרכז ══ -->
+    <circle cx="300" cy="150" r="68" fill="#0D0820" stroke="#7F77DD" stroke-width="1.5"/>
+    <circle cx="300" cy="150" r="58" fill="#12103A" stroke="#534AB7" stroke-width="0.5" opacity="0.4"/>
+    <text x="300" y="143" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="30" font-weight="900" fill="#A09AEC">A7</text>
+    <text x="300" y="168" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="10" fill="#7F77DD" letter-spacing="2">AGENT 7</text>
+    <circle cx="300" cy="150" r="84" fill="none" stroke="#534AB7" stroke-width="0.4" stroke-dasharray="3 6" opacity="0.4"/>
+
+    <!-- מנהל — שמאל עליון -->
+    <circle cx="90" cy="72" r="32" fill="#0D1827" stroke="#1B4F8A" stroke-width="1"/>
+    <text x="90" y="67" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="17">👔</text>
+    <text x="90" y="84" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="10" font-weight="700" fill="#4A9EDB">מנהל</text>
+    <text x="90" y="113" text-anchor="middle" font-family="Heebo,sans-serif" font-size="9" fill="#3A6E9E">שולח הוראות</text>
+
+    <!-- עובד — למעלה -->
+    <circle cx="300" cy="26" r="24" fill="#0D1827" stroke="#0F6E56" stroke-width="1"/>
+    <text x="300" y="22" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="14">👷</text>
+    <text x="300" y="34" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="9" font-weight="700" fill="#3EC48A">עובד א׳</text>
+    <text x="300" y="58" text-anchor="middle" font-family="Heebo,sans-serif" font-size="9" fill="#2A7A56">מקבל משימות</text>
+
+    <!-- עובד — ימין עליון -->
+    <circle cx="510" cy="72" r="32" fill="#0D1827" stroke="#0F6E56" stroke-width="1"/>
+    <text x="510" y="67" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="17">👩‍💼</text>
+    <text x="510" y="84" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="10" font-weight="700" fill="#3EC48A">עובדת ב׳</text>
+    <text x="510" y="113" text-anchor="middle" font-family="Heebo,sans-serif" font-size="9" fill="#2A7A56">מקבלת משימות</text>
+
+    <!-- עובד — ימין תחתון -->
+    <circle cx="510" cy="228" r="32" fill="#0D1827" stroke="#0F6E56" stroke-width="1"/>
+    <text x="510" y="223" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="17">🧑‍🔧</text>
+    <text x="510" y="240" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="10" font-weight="700" fill="#3EC48A">עובד ג׳</text>
+    <text x="510" y="269" text-anchor="middle" font-family="Heebo,sans-serif" font-size="9" fill="#2A7A56">מקבל משימות</text>
+
+    <!-- דשבורד — שמאל תחתון -->
+    <circle cx="90" cy="228" r="32" fill="#0D1827" stroke="#1B4F8A" stroke-width="1"/>
+    <text x="90" y="223" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="17">📊</text>
+    <text x="90" y="240" text-anchor="middle" dominant-baseline="central" font-family="Heebo,sans-serif" font-size="10" font-weight="700" fill="#4A9EDB">דשבורד</text>
+    <text x="90" y="269" text-anchor="middle" font-family="Heebo,sans-serif" font-size="9" fill="#3A6E9E">ראיית הכול</text>
+
+    <text x="300" y="291" text-anchor="middle" font-family="Heebo,sans-serif" font-size="10" fill="#6B629E">Agent 7 מנהל, מחלק ועונה — בזמן אמת</text>
+  </svg>
+</section>
+
+
+
+<div class="modal-overlay" id="contactModal" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal">
+    <button class="modal-close" onclick="document.getElementById('contactModal').classList.remove('open')">×</button>
+    <h2>צור קשר</h2>
+    <p>השאירו פרטים ונחזור אליכם בהקדם</p>
+    <form action="https://formsubmit.co/shvirooren@gmail.com" method="POST">
+      <input type="hidden" name="_subject" value="פנייה חדשה מ-Agent 7">
+      <input type="hidden" name="_captcha" value="false">
+      <input type="hidden" name="_next" value="javascript:void(0)">
+      <input type="hidden" name="_template" value="table">
+      <div class="form-group">
+        <label>שם מלא *</label>
+        <input type="text" name="שם מלא" required placeholder="ישראל ישראלי">
+      </div>
+      <div class="form-group">
+        <label>טלפון *</label>
+        <input type="tel" name="טלפון" required placeholder="050-0000000">
+      </div>
+      <div class="form-group">
+        <label>אימייל</label>
+        <input type="email" name="אימייל" placeholder="example@mail.com">
+      </div>
+      <div class="form-group">
+        <label>הודעה</label>
+        <textarea name="הודעה" placeholder="במה נוכל לעזור?"></textarea>
+      </div>
+      <button type="submit" class="btn-submit">שליחה</button>
+    </form>
+  </div>
+</div>
+
+<footer>
+  <div class="footer-logo">AGENT <span>7</span> © 2026</div>
+
+</footer>
+
+
+</body>
+</html>

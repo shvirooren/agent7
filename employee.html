@@ -1,0 +1,784 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 7 - פורטל עובד</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--bd:#003366;--bm:#0055A4;--ba:#009FE3;--bp:#E8F4FC;--gl:#F5F7FA;--gm:#E2E8EF;--gt:#5A6A7A;--td:#1A2B3C;--gr:#16A34A;--gp:#DCFCE7;--rd:#DC2626;--rp:#FEE2E2;--or:#D97706;--op:#FEF3C7}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-height:100vh;direction:rtl}
+
+/* ── Topbar ── */
+.topbar{background:var(--bd);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:50;box-shadow:0 2px 12px rgba(0,0,0,.18)}
+.logo{display:flex;align-items:center;gap:10px}
+.lic{width:30px;height:30px;background:linear-gradient(135deg,var(--bm),var(--ba));border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#fff}
+.ltx{font-size:15px;font-weight:800;color:#fff;letter-spacing:1px}
+.ltx span{color:var(--ba)}
+.uinfo{display:flex;align-items:center;gap:10px}
+.uav{width:32px;height:32px;background:var(--bm);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:#fff;border:2px solid rgba(255,255,255,.2)}
+.unm{font-size:13px;color:rgba(255,255,255,.85);font-weight:600}
+.bout{background:rgba(255,255,255,.1);color:rgba(255,255,255,.75);border:1px solid rgba(255,255,255,.15);padding:6px 14px;border-radius:4px;font-size:12px;cursor:pointer;font-family:'Heebo',sans-serif;transition:.15s}
+.bout:hover{background:rgba(255,255,255,.2);color:#fff}
+
+/* ── Layout ── */
+.cnt{max-width:720px;margin:0 auto;padding:28px 20px}
+
+/* ── Greeting ── */
+.greeting{margin-bottom:24px}
+.greeting h1{font-size:22px;font-weight:800;color:var(--bd)}
+.greeting p{font-size:13px;color:var(--gt);margin-top:3px}
+.company-tag{display:inline-flex;align-items:center;gap:5px;margin-top:8px;background:var(--bp);border:1px solid var(--gm);padding:4px 12px;border-radius:100px;font-size:12px;font-weight:600;color:var(--bm)}
+
+/* ── Stats ── */
+.srow{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:24px}
+.sc{background:#fff;border:1px solid var(--gm);border-radius:8px;padding:16px;text-align:center;transition:.15s}
+.sc:hover{border-color:var(--ba);box-shadow:0 2px 12px rgba(0,133,204,.08)}
+.scl{font-size:11px;color:var(--gt);font-weight:700;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.scv{font-size:28px;font-weight:900;transition:all .3s}
+
+/* ── Filters ── */
+.filters-row{display:flex;align-items:center;gap:6px;margin-bottom:16px;flex-wrap:wrap}
+.fbtn{padding:6px 16px;border-radius:100px;font-size:13px;font-weight:600;cursor:pointer;font-family:'Heebo',sans-serif;border:1.5px solid var(--gm);background:#fff;color:var(--gt);transition:.15s}
+.fbtn:hover{border-color:var(--bm);color:var(--bm)}
+.fbtn.on{background:var(--bm);color:#fff;border-color:var(--bm)}
+.view-toggle{margin-right:auto;display:flex;gap:4px;background:var(--gl);border:1.5px solid var(--gm);border-radius:7px;padding:3px}
+.vtbtn{padding:5px 14px;border-radius:4px;font-size:12px;font-weight:600;cursor:pointer;font-family:'Heebo',sans-serif;border:none;background:transparent;color:var(--gt);transition:.15s}
+.vtbtn.on{background:#fff;color:var(--bm);box-shadow:0 1px 4px rgba(0,0,0,.1)}
+
+/* ── Task cards ── */
+.task-card{background:#fff;border:1.5px solid var(--gm);border-radius:10px;margin-bottom:12px;overflow:hidden;transition:border-color .15s,box-shadow .15s,opacity .3s,transform .3s}
+.task-card:hover{border-color:var(--ba);box-shadow:0 2px 12px rgba(0,85,164,.08)}
+.task-card.urgent{border-right:4px solid var(--rd)}
+.task-card.medium{border-right:4px solid var(--or)}
+.task-card.normal{border-right:4px solid var(--ba)}
+.task-card.done{opacity:.55}
+.task-card.done .task-title{text-decoration:line-through;color:var(--gt)}
+.task-card.entering{animation:cardIn .25s ease both}
+@keyframes cardIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+
+.task-main{padding:16px 18px;display:flex;align-items:flex-start;gap:14px}
+.task-icon{width:38px;height:38px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;margin-top:1px}
+.task-icon.urg{background:var(--rp)}
+.task-icon.med{background:var(--op)}
+.task-icon.nor{background:var(--bp)}
+.task-icon.don{background:var(--gp)}
+.task-content{flex:1;min-width:0}
+.task-title{font-size:15px;font-weight:700;color:var(--td);margin-bottom:4px}
+.task-desc{font-size:13px;color:var(--gt);line-height:1.5}
+.task-meta{display:flex;align-items:center;gap:8px;margin-top:8px;flex-wrap:wrap}
+.bdg{display:inline-block;font-size:11px;font-weight:700;padding:2px 9px;border-radius:2px}
+.brd{background:var(--rp);color:var(--rd)}
+.bor{background:var(--op);color:var(--or)}
+.bbl{background:var(--bp);color:var(--bm)}
+.bgr{background:var(--gp);color:var(--gr)}
+.task-file{font-size:12px;color:var(--bm);text-decoration:none;display:inline-flex;align-items:center;gap:3px}
+.task-file:hover{text-decoration:underline}
+
+/* ── Action buttons ── */
+.task-actions{padding:10px 18px;background:var(--gl);border-top:1px solid var(--gm);display:flex;gap:8px}
+.abtn{flex:1;padding:8px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;border:none;transition:.15s;position:relative;min-height:36px}
+.abtn:disabled{opacity:.5;cursor:not-allowed}
+.abtn-start{background:var(--op);color:var(--or)}
+.abtn-start:hover:not(:disabled){background:#fde68a}
+.abtn-done{background:var(--gp);color:var(--gr)}
+.abtn-done:hover:not(:disabled){background:#bbf7d0}
+.abtn-open{background:var(--rp);color:var(--rd)}
+.abtn-open:hover:not(:disabled){background:#fecaca}
+.abtn-done-solid{background:var(--gr);color:#fff}
+.abtn-done-solid:hover:not(:disabled){background:#15803d}
+
+/* Spinner inside button */
+.btn-spinner{display:inline-block;width:13px;height:13px;border:2px solid rgba(0,0,0,.2);border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle;margin-left:4px}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Empty state ── */
+.empty{text-align:center;color:var(--gt);padding:60px 20px;font-size:15px}
+.empty-icon{font-size:48px;margin-bottom:12px}
+
+/* ── Kanban ── */
+.kanban-board{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;align-items:start}
+.kanban-col{background:#fff;border:1.5px solid var(--gm);border-radius:10px;overflow:hidden;display:flex;flex-direction:column}
+.kanban-col-header{padding:11px 14px;border-bottom:1px solid var(--gm);display:flex;align-items:center;justify-content:space-between;background:var(--gl)}
+.kanban-col-title{font-size:13px;font-weight:700;color:var(--td)}
+.kanban-col-count{font-size:11px;font-weight:700;padding:2px 8px;border-radius:100px}
+.kc-open{background:var(--rp);color:var(--rd)}
+.kc-prog{background:var(--op);color:var(--or)}
+.kc-done{background:var(--gp);color:var(--gr)}
+.kanban-drop-zone{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;min-height:120px;transition:background .15s}
+.kanban-drop-zone.drag-over{background:var(--bp);border-radius:6px}
+.kcard{background:#fff;border:1.5px solid var(--gm);border-radius:8px;padding:12px;cursor:grab;user-select:none;transition:box-shadow .15s,opacity .15s}
+.kcard:active{cursor:grabbing}
+.kcard.dragging{opacity:.4}
+.kcard.urgent{border-right:3px solid var(--rd)}
+.kcard.medium{border-right:3px solid var(--or)}
+.kcard.normal{border-right:3px solid var(--ba)}
+.kcard.done-k{opacity:.55}
+.kcard-title{font-size:13px;font-weight:700;color:var(--td);margin-bottom:6px;line-height:1.4}
+.kcard-title.struck{text-decoration:line-through;color:var(--gt)}
+.kcard-desc{font-size:11px;color:var(--gt);line-height:1.5;margin-bottom:8px}
+.kcard-footer{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap}
+.kcard-actions{display:flex;gap:4px;margin-top:8px}
+.kabtn{flex:1;padding:5px 8px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;border:none;transition:.15s;overflow:hidden;text-overflow:ellipsis}
+.kabtn:disabled{opacity:.5;cursor:not-allowed}
+.kabtn-start{background:var(--op);color:var(--or)}
+.kabtn-start:hover:not(:disabled){background:#fde68a}
+.kabtn-done{background:var(--gr);color:#fff}
+.kabtn-done:hover:not(:disabled){background:#15803d}
+.kabtn-open{background:var(--rp);color:var(--rd)}
+.kabtn-open:hover:not(:disabled){background:#fecaca}
+
+/* ── Tab toggle ── */
+.tab-toggle{display:flex;gap:0;background:var(--gl);border:1.5px solid var(--gm);border-radius:9px;padding:4px;margin-bottom:22px;width:fit-content}
+.ttab{padding:8px 22px;border-radius:6px;font-size:14px;font-weight:600;cursor:pointer;font-family:'Heebo',sans-serif;border:none;background:transparent;color:var(--gt);transition:.15s}
+.ttab.on{background:#fff;color:var(--bm);box-shadow:0 1px 6px rgba(0,0,0,.1)}
+
+/* ── Agent Chat ── */
+#agent-panel{display:none;flex-direction:column;height:calc(100vh - 260px);min-height:400px;background:#fff;border:1.5px solid var(--gm);border-radius:12px;overflow:hidden}
+.agent-chat-header{background:var(--bd);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.agent-chat-title{font-size:14px;font-weight:700}
+.agent-chat-sub{font-size:12px;color:#93c5fd;margin-top:2px}
+.end-conv-btn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:6px 13px;border-radius:7px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
+.end-conv-btn:hover{background:rgba(255,255,255,.22)}
+.end-conv-btn:disabled{opacity:.5;cursor:not-allowed}
+.chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--gl)}
+.cmsg{display:flex;gap:8px;max-width:80%}
+.cmsg.user{align-self:flex-start;flex-direction:row-reverse}
+.cmsg.assistant{align-self:flex-end}
+.cmsg-av{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.cmsg.user .cmsg-av{background:var(--gm)}
+.cmsg.assistant .cmsg-av{background:linear-gradient(135deg,var(--bm),var(--ba))}
+.cmsg-bubble{padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.6}
+.cmsg.user .cmsg-bubble{background:#fff;color:var(--td);border-bottom-right-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.cmsg.assistant .cmsg-bubble{background:var(--bm);color:#fff;border-bottom-left-radius:3px}
+.chat-input-row{display:flex;gap:8px;padding:14px 18px;background:#fff;border-top:1px solid var(--gm);flex-shrink:0;align-items:flex-end}
+#agent-input{flex:1;padding:10px 14px;border:1.5px solid var(--gm);border-radius:10px;font-family:'Heebo',sans-serif;font-size:14px;outline:none;resize:none;max-height:100px;transition:border-color .2s;color:var(--td)}
+#agent-input:focus{border-color:var(--ba)}
+.chat-send-btn{width:40px;height:40px;background:var(--bm);border:none;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;transition:.15s;flex-shrink:0}
+.chat-send-btn:hover{background:var(--bd)}
+.chat-send-btn:disabled{background:var(--gm);cursor:not-allowed}
+.chat-welcome{text-align:center;padding:40px 20px;color:var(--gt)}
+.typing-dots{display:none;align-self:flex-end;padding:10px 14px;background:var(--bm);border-radius:12px;border-bottom-left-radius:3px}
+.typing-dots.show{display:flex;gap:5px}
+.typing-dot{width:6px;height:6px;background:rgba(255,255,255,.6);border-radius:50%;animation:tdot 1.2s infinite}
+.typing-dot:nth-child(2){animation-delay:.2s}
+.typing-dot:nth-child(3){animation-delay:.4s}
+@keyframes tdot{0%,60%,100%{transform:translateY(0)}30%{transform:translateY(-5px)}}
+
+/* ── Error banner ── */
+.err-banner{background:var(--rp);border:1px solid #FCA5A5;color:var(--rd);border-radius:8px;padding:14px 18px;margin-bottom:18px;font-size:13.5px;display:none}
+.err-banner.show{display:flex;align-items:center;gap:10px}
+
+@media(max-width:700px){.kanban-board{grid-template-columns:1fr}}
+@media(max-width:600px){.cnt{padding:16px}}
+@media(max-width:480px){
+  .cnt{padding:12px 14px}
+  .srow{gap:8px}
+  .sc{padding:12px 10px}
+  .scv{font-size:22px}
+  .scl{font-size:10px}
+  .topbar{padding:0 14px}
+  .filters-row{gap:4px}
+  .fbtn{padding:5px 12px;font-size:12px}
+  .task-main{padding:12px 14px}
+  .task-actions{padding:8px 14px;flex-wrap:wrap}
+  .abtn{min-height:36px;font-size:12px}
+  .fbtn{min-height:36px;padding:6px 14px}
+  .vtbtn{min-height:32px}
+  .bout{padding:8px 12px;min-height:36px}
+  .greeting h1{font-size:18px}
+}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="logo">
+    <div class="lic">A7</div>
+    <div class="ltx">AGENT <span>7</span></div>
+  </div>
+  <div class="uinfo">
+    <div class="uav" id="uav">?</div>
+    <div class="unm" id="unm">טוען...</div>
+    <button class="bout" onclick="doLogout()">יציאה</button>
+  </div>
+</div>
+
+<div class="cnt">
+  <div id="err-banner" class="err-banner">
+    <span>⚠️</span><span id="err-banner-msg"></span>
+  </div>
+
+  <div class="greeting">
+    <h1 id="greeting-title">שלום 👋</h1>
+    <p id="greeting-date"></p>
+    <div id="company-name-emp" style="display:none" class="company-tag">🏢 <span id="company-name-text"></span></div>
+  </div>
+
+  <!-- Tab Toggle -->
+  <div class="tab-toggle">
+    <button class="ttab on" id="tab-tasks" onclick="switchTab('tasks')">📋 המשימות שלי</button>
+    <button class="ttab" id="tab-agent" onclick="switchTab('agent')">🤖 הסוכן שלי</button>
+  </div>
+
+  <!-- Tasks View -->
+  <div id="tasks-view">
+    <div class="srow">
+      <div class="sc"><div class="scl">פתוחות</div><div class="scv" id="s-open" style="color:var(--rd)">—</div></div>
+      <div class="sc"><div class="scl">בביצוע</div><div class="scv" id="s-progress" style="color:var(--or)">—</div></div>
+      <div class="sc"><div class="scl">הושלמו</div><div class="scv" id="s-done" style="color:var(--gr)">—</div></div>
+    </div>
+
+  <div class="filters-row">
+    <button class="fbtn on" onclick="filterEmp('all',this)">הכל</button>
+    <button class="fbtn" onclick="filterEmp('פתוח',this)">פתוח</button>
+    <button class="fbtn" onclick="filterEmp('בביצוע',this)">בביצוע</button>
+    <button class="fbtn" onclick="filterEmp('הושלם',this)">הושלם</button>
+    <div class="view-toggle">
+      <button class="vtbtn on" id="vt-list" onclick="setView('list')">📋 רשימה</button>
+      <button class="vtbtn" id="vt-kanban" onclick="setView('kanban')">🗂️ לוח</button>
+    </div>
+  </div>
+
+  <div id="tasks-list"></div>
+
+  <div id="kanban-wrap" style="display:none">
+    <div class="kanban-board">
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span class="kanban-col-title">🔴 פתוח</span>
+          <span class="kanban-col-count kc-open" id="kc-open">0</span>
+        </div>
+        <div class="kanban-drop-zone" id="kdrop-פתוח" data-status="פתוח"
+          ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)"></div>
+      </div>
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span class="kanban-col-title">🟡 בביצוע</span>
+          <span class="kanban-col-count kc-prog" id="kc-prog">0</span>
+        </div>
+        <div class="kanban-drop-zone" id="kdrop-בביצוע" data-status="בביצוע"
+          ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)"></div>
+      </div>
+      <div class="kanban-col">
+        <div class="kanban-col-header">
+          <span class="kanban-col-title">🟢 הושלם</span>
+          <span class="kanban-col-count kc-done" id="kc-done">0</span>
+        </div>
+        <div class="kanban-drop-zone" id="kdrop-הושלם" data-status="הושלם"
+          ondragover="onDragOver(event)" ondrop="onDrop(event)" ondragleave="onDragLeave(event)"></div>
+      </div>
+    </div>
+  </div>
+  </div><!-- /tasks-view -->
+
+  <!-- Agent View -->
+  <div id="agent-panel" style="display:none;flex-direction:column;height:calc(100vh - 200px);min-height:420px;background:#fff;border:1.5px solid var(--gm);border-radius:12px;overflow:hidden">
+    <div class="agent-chat-header">
+      <div>
+        <div class="agent-chat-title" id="agent-panel-title">🤖 הסוכן שלי</div>
+        <div class="agent-chat-sub" id="agent-panel-sub">טוען...</div>
+      </div>
+      <button class="end-conv-btn" id="end-conv-btn" onclick="endRoleConversation()">סיים שיחה ✓</button>
+    </div>
+    <div class="chat-messages" id="chat-messages">
+      <div class="chat-welcome" id="chat-welcome">
+        <div style="font-size:48px;margin-bottom:12px">🤖</div>
+        <div style="font-size:17px;font-weight:700;color:var(--bd);margin-bottom:8px" id="chat-welcome-title">שלום!</div>
+        <div style="font-size:14px;line-height:1.7;max-width:360px;margin:0 auto" id="chat-welcome-text">אני הסוכן שלך. שאל אותי כל שאלה הקשורה לתפקיד שלך.</div>
+      </div>
+      <div class="typing-dots" id="typing-dots">
+        <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
+      </div>
+    </div>
+    <div class="chat-input-row">
+      <textarea id="agent-input" placeholder="כתוב הודעה לסוכן..." rows="1"></textarea>
+      <button class="chat-send-btn" id="agent-send-btn" onclick="sendRoleMessage()">➤</button>
+    </div>
+  </div>
+
+</div><!-- /cnt -->
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+// ═══════════════════════════
+//  CORE (inlined for single-file deploy)
+// ═══════════════════════════
+var SURL='https://gmjfhjnwoymmxfqdazqf.supabase.co';
+var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
+var sb=supabase.createClient(SURL,SKEY);
+
+function esc(str){if(str==null)return '';var d=document.createElement('div');d.textContent=String(str);return d.innerHTML;}
+
+// ── Toast ──
+(function(){
+  var c=document.createElement('div');
+  c.id='a7tc';
+  c.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none';
+  document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(c);});
+  var KF={success:{bg:'#DCFCE7',color:'#15803d',border:'#86EFAC',icon:'✓'},error:{bg:'#FEE2E2',color:'#DC2626',border:'#FCA5A5',icon:'✕'},warning:{bg:'#FEF3C7',color:'#D97706',border:'#FDE68A',icon:'⚠'},info:{bg:'#E8F4FC',color:'#0055A4',border:'#BAE6FD',icon:'ℹ'}};
+  window.toast=function(msg,type,dur){
+    dur=dur||3200;var k=KF[type]||KF.info;
+    var el=document.createElement('div');
+    el.style.cssText='background:'+k.bg+';color:'+k.color+';border:1.5px solid '+k.border+';border-radius:8px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:Heebo,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.12);pointer-events:auto;max-width:340px;text-align:center;animation:a7TIn .25s cubic-bezier(.34,1.56,.64,1);direction:rtl;display:flex;align-items:center;gap:8px';
+    el.innerHTML='<span>'+k.icon+'</span><span>'+esc(msg)+'</span>';
+    if(!document.getElementById('a7ks')){var s=document.createElement('style');s.id='a7ks';s.textContent='@keyframes a7TIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}@keyframes a7TOut{from{opacity:1}to{opacity:0;transform:translateY(8px)}}@keyframes a7Shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}';document.head.appendChild(s);}
+    document.getElementById('a7tc').appendChild(el);
+    setTimeout(function(){el.style.animation='a7TOut .2s ease forwards';setTimeout(function(){el.remove();},220);},dur);
+  };
+})();
+
+// ── Skeleton ──
+function skeletonCards(n){
+  var h='';for(var i=0;i<n;i++){h+='<div style="background:#fff;border:1.5px solid #e2e8ef;border-radius:10px;padding:16px 18px;margin-bottom:12px"><div style="height:16px;width:55%;border-radius:4px;background:linear-gradient(90deg,#e2e8ef 25%,#f0f4f8 50%,#e2e8ef 75%);background-size:400% 100%;animation:a7Shimmer 1.4s infinite;margin-bottom:10px"></div><div style="height:12px;width:80%;border-radius:4px;background:linear-gradient(90deg,#e2e8ef 25%,#f0f4f8 50%,#e2e8ef 75%);background-size:400% 100%;animation:a7Shimmer 1.4s infinite"></div></div>';}return h;
+}
+
+// ═══════════════════════════
+//  STATE
+// ═══════════════════════════
+var CU=null, EMP_ID=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null;
+var pendingStatusUpdate={};  // taskId → true  (debounce double-clicks)
+
+// ── Greeting ──
+var now=new Date(), hour=now.getHours();
+var greet=hour<12?'בוקר טוב':hour<17?'צהריים טובים':'ערב טוב';
+document.getElementById('greeting-date').textContent=now.toLocaleDateString('he-IL',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+
+// ═══════════════════════════
+//  BOOT — single auth check, no duplication
+// ═══════════════════════════
+sb.auth.getSession().then(function(r){
+  if(!r.data.session){window.location.href='login.html';return;}
+  CU=r.data.session.user;
+  // Show user initials immediately
+  var nm=CU.user_metadata&&CU.user_metadata.full_name?CU.user_metadata.full_name:CU.email;
+  document.getElementById('unm').textContent=esc(nm);
+  document.getElementById('uav').textContent=nm.charAt(0).toUpperCase();
+  document.getElementById('greeting-title').textContent=greet+' '+esc(nm.split(' ')[0])+' 👋';
+
+  // Show skeleton while loading
+  document.getElementById('tasks-list').innerHTML=skeletonCards(4);
+
+  // Role check — redirect managers
+  sb.from('user_roles').select('role').eq('auth_user_id',CU.id).single().then(function(rc){
+    if(!rc.error&&rc.data&&rc.data.role==='manager'){window.location.href='dashboard.html';return;}
+    getEmployeeId();
+  });
+});
+
+// ═══════════════════════════
+//  EMPLOYEE ID + COMPANY
+// ═══════════════════════════
+function getEmployeeId(){
+  sb.from('employee_users').select('employee_id,manager_id').eq('auth_user_id',CU.id).single().then(function(r){
+    if(r.error||!r.data){
+      document.getElementById('tasks-list').innerHTML='<div class="empty"><div class="empty-icon">🔗</div>החשבון שלך עדיין לא מקושר לעובד.<br>פנה למנהל שלך.</div>';
+      return;
+    }
+    EMP_ID=r.data.employee_id;
+
+    // Company name (non-blocking)
+    if(r.data.manager_id){
+      sb.from('companies').select('company_name').eq('manager_id',r.data.manager_id).single().then(function(cr){
+        if(cr.data&&cr.data.company_name){
+          document.getElementById('company-name-text').textContent=esc(cr.data.company_name);
+          document.getElementById('company-name-emp').style.display='inline-flex';
+          document.title=esc(cr.data.company_name)+' — Agent 7';
+        }
+      });
+    }
+
+    // Employee name from employees table (overrides auth metadata)
+    sb.from('employees').select('name').eq('id',EMP_ID).single().then(function(er){
+      if(er.data&&er.data.name){
+        var n=er.data.name;
+        document.getElementById('unm').textContent=esc(n);
+        document.getElementById('uav').textContent=n.charAt(0).toUpperCase();
+        document.getElementById('greeting-title').textContent=greet+' '+esc(n.split(' ')[0])+' 👋';
+      }
+    });
+
+    loadTasks();
+
+    // Realtime subscription
+    sb.channel('emp-tasks-'+EMP_ID)
+      .on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+        function(){loadTasks();})
+      .subscribe();
+  });
+}
+
+// ═══════════════════════════
+//  DATA
+// ═══════════════════════════
+function loadTasks(){
+  sb.from('tasks').select('*').eq('employee_id',EMP_ID).order('created_at',{ascending:false})
+    .then(function(r){
+      if(r.error){showErr('שגיאה בטעינת משימות: '+r.error.message);return;}
+      allTasks=r.data||[];
+
+      sb.from('files').select('id,file_name,file_url,task_id').eq('employee_id',EMP_ID)
+        .then(function(fr){
+          var fm={};
+          if(fr.data)fr.data.forEach(function(f){if(f.task_id){if(!fm[f.task_id])fm[f.task_id]=[];fm[f.task_id].push(f);}});
+          allTasks=allTasks.map(function(t){t.files=fm[t.id]||[];return t;});
+          // Sort: open first, in-progress, done last
+          allTasks.sort(function(a,b){
+            var order={פתוח:0,בביצוע:1,הושלם:2};
+            return (order[a.status]||0)-(order[b.status]||0);
+          });
+          updateStats();
+          if(currentView==='kanban')renderKanban();
+          else renderTasks();
+        });
+    });
+}
+
+function updateStats(){
+  document.getElementById('s-open').textContent=allTasks.filter(function(t){return t.status==='פתוח';}).length;
+  document.getElementById('s-progress').textContent=allTasks.filter(function(t){return t.status==='בביצוע';}).length;
+  document.getElementById('s-done').textContent=allTasks.filter(function(t){return t.status==='הושלם';}).length;
+}
+
+// ═══════════════════════════
+//  STATUS UPDATE  (debounced, toast feedback)
+// ═══════════════════════════
+function updateStatus(id,status,btn){
+  if(pendingStatusUpdate[id])return; // prevent double-click
+  pendingStatusUpdate[id]=true;
+  if(btn){
+    btn.disabled=true;
+    btn.innerHTML=btn.innerHTML+'<span class="btn-spinner"></span>';
+  }
+  sb.from('tasks').update({status:status,updated_at:new Date().toISOString()}).eq('id',id)
+    .then(function(r){
+      delete pendingStatusUpdate[id];
+      if(r.error){
+        toast('שגיאה בעדכון סטטוס','error');
+        if(btn){btn.disabled=false;btn.innerHTML=btn.innerHTML.replace(/<span class="btn-spinner"><\/span>/,'');}
+        return;
+      }
+      var statusLabels={פתוח:'פתוח',בביצוע:'בביצוע',הושלם:'הושלם ✓'};
+      toast('סטטוס עודכן ל: '+statusLabels[status],'success',2000);
+      loadTasks();
+    });
+}
+
+// ═══════════════════════════
+//  RENDER — LIST VIEW
+// ═══════════════════════════
+var priorityClass={דחוף:'urgent',בינוני:'medium',רגיל:'normal'};
+var iconClass={דחוף:'urg',בינוני:'med',רגיל:'nor'};
+var iconEmoji={דחוף:'🔴',בינוני:'🟡',רגיל:'🔵'};
+var bdgClass={דחוף:'brd',בינוני:'bor',רגיל:'bbl'};
+
+function renderTasks(){
+  var list=document.getElementById('tasks-list');
+  var filtered=currentFilter==='all'?allTasks:allTasks.filter(function(t){return t.status===currentFilter;});
+  if(filtered.length===0){
+    var emptyMsgs={all:'אין לך משימות כרגע',פתוח:'אין משימות פתוחות',בביצוע:'אין משימות בביצוע',הושלם:'עוד לא השלמת משימות'};
+    var emptyIcons={all:'📋',פתוח:'📭',בביצוע:'⏳',הושלם:'🏆'};
+    var emptySubs={all:'כשיתווספו משימות חדשות, תראה אותן כאן',פתוח:'',בביצוע:'',הושלם:'השלם משימה כדי שתופיע כאן'};
+    var f=currentFilter;
+    list.innerHTML='<div class="empty"><div class="empty-icon">'+emptyIcons[f]+'</div><div style="font-size:16px;font-weight:700;color:var(--td);margin-bottom:6px">'+emptyMsgs[f]+'</div>'+(emptySubs[f]?'<div style="font-size:13px">'+emptySubs[f]+'</div>':'')+'</div>';
+    return;
+  }
+  list.innerHTML=filtered.map(function(t,i){
+    var isDone=t.status==='הושלם', isProgress=t.status==='בביצוע';
+    var pc=priorityClass[t.priority]||'normal';
+    var ic=isDone?'don':(iconClass[t.priority]||'nor');
+    var ie=isDone?'✅':(iconEmoji[t.priority]||'🔵');
+    var bc=bdgClass[t.priority]||'bbl';
+    var filesHtml='';
+    if(t.files&&t.files.length>0){
+      filesHtml='<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:8px">'+
+        t.files.map(function(f){return '<a href="'+esc(f.file_url)+'" target="_blank" rel="noopener noreferrer" class="task-file">📎 '+esc(f.file_name)+'</a>';}).join('')+
+      '</div>';
+    }
+    var actions='<div class="task-actions">';
+    if(!isDone&&!isProgress){
+      actions+='<button class="abtn abtn-start" onclick="updateStatus(\''+t.id+'\',\'בביצוע\',this)">▶ התחל</button>';
+      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+    }else if(isProgress){
+      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ חזרה</button>';
+      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+    }else{
+      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתח מחדש</button>';
+    }
+    actions+='</div>';
+    return '<div class="task-card '+pc+(isDone?' done':'')+' entering" style="animation-delay:'+Math.min(i*.04,.3)+'s">'+
+      '<div class="task-main">'+
+      '<div class="task-icon '+ic+'">'+ie+'</div>'+
+      '<div class="task-content">'+
+      '<div class="task-title">'+esc(t.title)+'</div>'+
+      (t.description?'<div class="task-desc">'+esc(t.description)+'</div>':'')+
+      '<div class="task-meta">'+
+      '<span class="bdg '+bc+'">'+esc(t.priority)+'</span>'+
+      (isProgress?'<span class="bdg bor">⏳ בביצוע</span>':'')+
+      (isDone?'<span class="bdg bgr">✓ הושלם</span>':'')+
+      '</div>'+
+      filesHtml+
+      '</div></div>'+actions+'</div>';
+  }).join('');
+}
+
+// ═══════════════════════════
+//  RENDER — KANBAN VIEW
+// ═══════════════════════════
+function renderKanban(){
+  var statuses=['פתוח','בביצוע','הושלם'];
+  var countIds={פתוח:'kc-open',בביצוע:'kc-prog',הושלם:'kc-done'};
+  statuses.forEach(function(status){
+    var zone=document.getElementById('kdrop-'+status);
+    if(!zone)return;
+    var tasks=allTasks.filter(function(t){return t.status===status;});
+    var countEl=document.getElementById(countIds[status]);
+    if(countEl)countEl.textContent=tasks.length;
+    if(tasks.length===0){var kIcons={פתוח:'📭',בביצוע:'⏸️',הושלם:'🏁'};var kLabels={פתוח:'אין משימות פתוחות',בביצוע:'אין משימות בביצוע',הושלם:'אין משימות שהושלמו'};zone.innerHTML='<div style="text-align:center;padding:32px 12px"><div style="font-size:28px;margin-bottom:8px">'+(kIcons[status]||'📋')+'</div><div style="font-size:12px;color:var(--gt);font-weight:600">'+(kLabels[status]||'אין משימות')+'</div></div>';return;}
+    var pc2=priorityClass, bc2=bdgClass;
+    zone.innerHTML=tasks.map(function(t){
+      var isDone=t.status==='הושלם', isProgress=t.status==='בביצוע';
+      var pc=pc2[t.priority]||'normal', pb=bc2[t.priority]||'bbl';
+      var acts='<div class="kcard-actions">';
+      if(!isDone&&!isProgress){
+        acts+='<button class="kabtn kabtn-start" onclick="updateStatus(\''+t.id+'\',\'בביצוע\',this)">▶ התחל</button>';
+        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+      }else if(isProgress){
+        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתוח</button>';
+        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+      }else{
+        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתח</button>';
+      }
+      acts+='</div>';
+      var fs='';
+      if(t.files&&t.files.length>0){fs='<div style="margin-top:5px">'+t.files.map(function(f){return '<a href="'+esc(f.file_url)+'" target="_blank" rel="noopener noreferrer" style="font-size:11px;color:var(--bm);text-decoration:none">📎 '+esc(f.file_name)+'</a>';}).join('')+'</div>';}
+      return '<div class="kcard '+pc+(isDone?' done-k':'')+'" draggable="true" data-id="'+t.id+'" ondragstart="onDragStart(event)" ondragend="onDragEnd(event)">'+
+        '<div class="kcard-title'+(isDone?' struck':'')+'">'+esc(t.title)+'</div>'+
+        (t.description?'<div class="kcard-desc">'+esc(t.description.substring(0,70))+(t.description.length>70?'…':'')+'</div>':'')+
+        fs+'<div class="kcard-footer"><span class="bdg '+pb+'">'+esc(t.priority)+'</span></div>'+acts+'</div>';
+    }).join('');
+  });
+}
+
+// ═══════════════════════════
+//  DRAG & DROP
+// ═══════════════════════════
+function onDragStart(e){dragTaskId=e.currentTarget.dataset.id;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
+function onDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.kanban-drop-zone').forEach(function(z){z.classList.remove('drag-over');});}
+function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
+function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
+function onDrop(e){
+  e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  var newStatus=e.currentTarget.dataset.status;
+  if(!dragTaskId||!newStatus)return;
+  var task=allTasks.find(function(t){return t.id===dragTaskId;});
+  if(!task||task.status===newStatus){dragTaskId=null;return;}
+  task.status=newStatus; // optimistic
+  updateStats();renderKanban();
+  sb.from('tasks').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',dragTaskId).then(function(r){
+    if(r.error){toast('שגיאה בעדכון','error');loadTasks();}
+    else{toast('סטטוס עודכן','success',1800);loadTasks();}
+    dragTaskId=null;
+  });
+}
+
+// ═══════════════════════════
+//  VIEW & FILTER
+// ═══════════════════════════
+function setView(view){
+  currentView=view;
+  document.getElementById('vt-list').classList.toggle('on',view==='list');
+  document.getElementById('vt-kanban').classList.toggle('on',view==='kanban');
+  document.getElementById('tasks-list').style.display=view==='list'?'':'none';
+  document.getElementById('kanban-wrap').style.display=view==='kanban'?'':'none';
+  document.querySelectorAll('.filters-row .fbtn').forEach(function(b){b.style.display=view==='kanban'?'none':'';});
+  if(view==='kanban')renderKanban();else renderTasks();
+}
+
+function filterEmp(filter,btn){
+  currentFilter=filter;
+  document.querySelectorAll('.fbtn').forEach(function(b){b.classList.remove('on');});
+  if(btn)btn.classList.add('on');
+  renderTasks();
+}
+
+// ═══════════════════════════
+//  HELPERS
+// ═══════════════════════════
+function showErr(msg){
+  var b=document.getElementById('err-banner');
+  document.getElementById('err-banner-msg').textContent=msg;
+  b.classList.add('show');
+}
+
+function doLogout(){
+  sb.auth.signOut().then(function(){window.location.href='login.html';});
+}
+
+// ══════════════════════════════════════════
+//  TAB TOGGLE
+// ══════════════════════════════════════════
+function switchTab(tab){
+  document.getElementById('tab-tasks').classList.toggle('on',tab==='tasks');
+  document.getElementById('tab-agent').classList.toggle('on',tab==='agent');
+  document.getElementById('tasks-view').style.display=tab==='tasks'?'block':'none';
+  var ap=document.getElementById('agent-panel');
+  ap.style.display=tab==='agent'?'flex':'none';
+  if(tab==='agent'&&!roleAgent)loadRoleAgent();
+}
+
+// ══════════════════════════════════════════
+//  ROLE AGENT — הסוכן שלי
+// ══════════════════════════════════════════
+var ROLE_WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
+var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false;
+
+function loadRoleAgent(){
+  if(!EMP_ID)return;
+  // טוען עובד עם תפקיד
+  sb.from('employees').select('*, job_roles(*)').eq('id',EMP_ID).maybeSingle().then(function(r){
+    var emp=r.data;
+    if(!emp||!emp.role_id||!emp.job_roles){
+      document.getElementById('agent-panel-sub').textContent='לא שויך לתפקיד';
+      document.getElementById('chat-welcome-title').textContent='הסוכן עוד לא מוכן';
+      document.getElementById('chat-welcome-text').textContent='פנה למנהל שלך כדי לשייך אותך לתפקיד וסוכן.';
+      return;
+    }
+    roleProfile=emp.job_roles;
+    document.getElementById('agent-panel-title').textContent='🤖 '+esc(roleProfile.title);
+    document.getElementById('agent-panel-sub').textContent='מומחה תפקיד מתמיד';
+    document.getElementById('chat-welcome-title').textContent='שלום!';
+    document.getElementById('chat-welcome-text').textContent='אני הסוכן של תפקיד "'+esc(roleProfile.title)+'". שאל אותי כל שאלה הקשורה לתפקיד שלך.';
+
+    // טוען סוכן וזיכרון
+    sb.from('role_agents').select('*').eq('role_id',emp.role_id).maybeSingle().then(function(ar){
+      roleAgent=ar.data;
+      if(roleAgent){
+        sb.from('role_agent_memory').select('*').eq('agent_id',roleAgent.id).order('importance',{ascending:false}).limit(40).then(function(mr){
+          roleMemory=mr.data||[];
+        });
+        // פתח שיחה חדשה
+        sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){
+          if(cr.data)roleConvId=cr.data.id;
+        });
+      }
+    });
+  });
+}
+
+function sendRoleMessage(){
+  var input=document.getElementById('agent-input');
+  var msg=input.value.trim();
+  if(!msg||roleLoading)return;
+  if(!roleProfile){toast('הסוכן עדיין לא נטען','warning');return;}
+
+  input.value='';
+  input.style.height='auto';
+  roleLoading=true;
+  document.getElementById('chat-welcome').style.display='none';
+  addChatMsg('user',msg);
+  roleConvHistory.push({role:'user',content:msg});
+
+  // שמור ל-DB
+  if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'user',content:msg});
+
+  showTyping(true);
+  document.getElementById('agent-send-btn').disabled=true;
+
+  // Get company name
+  var companyName='';
+  var cnEl=document.getElementById('company-name-text');
+  if(cnEl)companyName=cnEl.textContent||'';
+
+  fetch(ROLE_WORKER_URL+'/role-chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      role_profile:{title:roleProfile.title,description:roleProfile.description||'',responsibilities:roleProfile.responsibilities||'',company_name:companyName},
+      memory:roleMemory,
+      conversation_history:roleConvHistory.slice(-20),
+      new_message:msg
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    showTyping(false);
+    var reply=data.reply||'מצטערת, הייתה שגיאה.';
+    roleConvHistory.push({role:'assistant',content:reply});
+    addChatMsg('assistant',reply);
+    if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'assistant',content:reply});
+  }).catch(function(){
+    showTyping(false);
+    addChatMsg('assistant','מצטערת, הייתה שגיאה. אנא נסה שוב.');
+  }).finally(function(){
+    roleLoading=false;
+    document.getElementById('agent-send-btn').disabled=false;
+  });
+}
+
+function addChatMsg(role,content){
+  var area=document.getElementById('chat-messages');
+  var typing=document.getElementById('typing-dots');
+  var div=document.createElement('div');
+  div.className='cmsg '+role;
+  var av=role==='user'?'👤':'🤖';
+  var time=new Date().toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  div.innerHTML='<div class="cmsg-av">'+av+'</div><div><div class="cmsg-bubble">'+esc(content).replace(/\n/g,'<br>')+'</div><div style="font-size:11px;color:var(--gt);margin-top:3px;text-align:center">'+time+'</div></div>';
+  area.insertBefore(div,typing);
+  area.scrollTop=area.scrollHeight;
+}
+
+function showTyping(show){
+  var el=document.getElementById('typing-dots');
+  el.classList.toggle('show',show);
+  var area=document.getElementById('chat-messages');
+  area.scrollTop=area.scrollHeight;
+}
+
+function endRoleConversation(){
+  if(roleConvHistory.length<2){toast('אין מספיק שיחה לסיכום','warning');return;}
+  var btn=document.getElementById('end-conv-btn');
+  btn.disabled=true;btn.textContent='שומר...';
+
+  // סגור שיחה ב-DB
+  if(roleConvId)sb.from('role_conversations').update({ended_at:new Date().toISOString()}).eq('id',roleConvId);
+
+  fetch(ROLE_WORKER_URL+'/role-learn',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      conversation_history:roleConvHistory,
+      role_profile:{title:roleProfile?roleProfile.title:'',description:roleProfile?roleProfile.description:'',responsibilities:roleProfile?roleProfile.responsibilities:''}
+    })
+  }).then(function(r){return r.json();}).then(function(data){
+    var insights=data.insights||[];
+    var saved=0;
+    if(roleAgent&&insights.length){
+      var inserts=insights.map(function(ins){return {agent_id:roleAgent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};});
+      sb.from('role_agent_memory').insert(inserts).then(function(){
+        sb.from('role_agents').update({total_conversations:(roleAgent.total_conversations||0)+1,last_updated:new Date().toISOString()}).eq('id',roleAgent.id);
+      });
+      saved=inserts.length;
+    }
+    toast('השיחה נשמרה! '+(saved?saved+' תובנות נוספו לסוכן.':''),'success');
+    // איפוס לשיחה חדשה
+    roleConvHistory=[];roleConvId=null;
+    document.querySelectorAll('.cmsg').forEach(function(m){m.remove();});
+    document.getElementById('chat-welcome').style.display='block';
+    if(roleAgent)sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){if(cr.data)roleConvId=cr.data.id;});
+  }).catch(function(){
+    toast('שגיאה בשמירת השיחה','error');
+  }).finally(function(){
+    btn.disabled=false;btn.textContent='סיים שיחה ✓';
+  });
+}
+
+// Auto-resize textarea
+var agentInput=document.getElementById('agent-input');
+if(agentInput){
+  agentInput.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';});
+  agentInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendRoleMessage();}});
+}
+</script>
+</body>
+</html>

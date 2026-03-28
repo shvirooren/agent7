@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent 7 — כניסה</title>
+<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:'Heebo',sans-serif;background:#F5F7FA;direction:rtl;min-height:100vh;display:flex;align-items:center;justify-content:center;}
+
+/* background */
+.bg{position:fixed;inset:0;background:linear-gradient(160deg,#003366 0%,#0055A4 60%,#0077CC 100%);z-index:0}
+.bg-pattern{position:fixed;inset:0;z-index:0;opacity:.06;background-image:radial-gradient(circle,#fff 1px,transparent 1px);background-size:28px 28px}
+
+/* card */
+.card{position:relative;z-index:1;background:#fff;border-radius:12px;padding:44px 40px;width:100%;max-width:420px;box-shadow:0 24px 64px rgba(0,0,0,.22)}
+
+/* logo */
+.logo{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:10px}
+.lic{width:42px;height:42px;background:linear-gradient(135deg,#0055A4,#009FE3);border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:#fff}
+.ltx{font-size:22px;font-weight:800;color:#003366;letter-spacing:1px}
+.ltx span{color:#0077CC}
+.tagline{text-align:center;font-size:13px;color:#5A6A7A;margin-bottom:32px}
+
+/* form elements */
+.fg{margin-bottom:18px}
+.fl{display:block;font-size:13px;font-weight:600;color:#1A2B3C;margin-bottom:6px}
+.fi{width:100%;padding:10px 12px;border:1.5px solid #E2E8EF;border-radius:6px;font-size:14px;font-family:'Heebo',sans-serif;color:#1A2B3C;direction:rtl;transition:border-color .2s,box-shadow .2s}
+.fi:focus{outline:none;border-color:#0055A4;box-shadow:0 0 0 3px rgba(0,85,164,.1)}
+
+/* button */
+.btn{width:100%;padding:13px;background:#0055A4;color:#fff;border:none;border-radius:6px;font-size:15px;font-weight:700;cursor:pointer;font-family:'Heebo',sans-serif;transition:background .2s,transform .1s;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover{background:#003366}
+.btn:active{transform:scale(.99)}
+.btn:disabled{opacity:.6;cursor:not-allowed}
+
+/* spinner */
+.spinner{width:16px;height:16px;border:2px solid rgba(255,255,255,.4);border-top-color:#fff;border-radius:50%;animation:spin .7s linear infinite;display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+.btn.loading .spinner{display:block}
+.btn.loading .btn-text{display:none}
+
+/* alert */
+.msg{padding:11px 14px;border-radius:5px;font-size:13px;margin-bottom:18px;display:none;border:1px solid}
+.msg.err{background:#FEE2E2;color:#DC2626;border-color:#FCA5A5;display:block}
+.msg.ok{background:#DCFCE7;color:#16A34A;border-color:#86EFAC;display:block}
+.msg.info{background:#E8F4FC;color:#0055A4;border-color:#BAE6FD;display:block}
+
+/* routing indicator */
+.role-pill{display:none;align-items:center;gap:6px;margin-top:12px;padding:8px 14px;border-radius:6px;font-size:13px;font-weight:600;animation:fadeIn .3s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}
+.role-pill.manager{background:#E8F4FC;color:#0055A4;border:1px solid #BAE6FD}
+.role-pill.employee{background:#DCFCE7;color:#16A34A;border:1px solid #86EFAC}
+
+/* links */
+.link-row{text-align:center;margin-top:16px;font-size:13px;color:#5A6A7A}
+.link-row a{color:#0055A4;text-decoration:none;font-weight:600}
+.link-row a:hover{text-decoration:underline}
+
+/* divider */
+.divider{text-align:center;color:#9aacb8;font-size:12px;margin:20px 0;position:relative}
+.divider::before{content:'';position:absolute;top:50%;left:0;right:0;height:1px;background:#E2E8EF}
+.divider span{background:#fff;padding:0 12px;position:relative}
+
+/* section toggle */
+.section{display:none}
+.section.active{display:block}
+
+/* back link */
+.back-link{display:flex;align-items:center;gap:4px;cursor:pointer;color:#5A6A7A;font-size:13px;margin-bottom:20px;width:fit-content}
+.back-link:hover{color:#0055A4}
+
+/* home link */
+.home-link{text-align:center;margin-top:24px}
+.home-link a{font-size:12px;color:#9aacb8;text-decoration:none}
+.home-link a:hover{color:#5A6A7A}
+
+@media(max-width:480px){
+  .card{padding:32px 20px;border-radius:0;min-height:100vh;display:flex;flex-direction:column;justify-content:center;box-shadow:none}
+  body{align-items:flex-start}
+}
+</style>
+</head>
+<body>
+<div class="bg"></div>
+<div class="bg-pattern"></div>
+
+<div class="card">
+  <div class="logo">
+    <div class="lic">A7</div>
+    <div class="ltx">AGENT <span>7</span></div>
+  </div>
+  <div class="tagline">כניסה למערכת</div>
+
+  <div id="msg" class="msg"></div>
+
+  <!-- ───── LOGIN SECTION ───── -->
+  <div class="section active" id="s-login">
+    <div class="fg">
+      <label class="fl">אימייל</label>
+      <input class="fi" type="email" id="login-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <div class="fg">
+      <label class="fl">סיסמה</label>
+      <input class="fi" type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password">
+    </div>
+
+    <!-- role indicator shown after checking -->
+    <div class="role-pill" id="role-pill"></div>
+
+    <button class="btn" id="login-btn" onclick="doLogin()" style="margin-top:20px">
+      <div class="spinner"></div>
+      <span class="btn-text">כניסה</span>
+    </button>
+
+    <div class="divider"><span>או</span></div>
+
+    <div class="link-row">
+      <a href="#" onclick="showSection('s-reset')">שכחתי סיסמה</a>
+    </div>
+  </div>
+
+  <!-- ───── RESET SECTION ───── -->
+  <div class="section" id="s-reset">
+    <div class="back-link" onclick="showSection('s-login')">← חזרה לכניסה</div>
+    <div class="fg">
+      <label class="fl">אימייל לאיפוס סיסמה</label>
+      <input class="fi" type="email" id="reset-email" placeholder="your@email.com" autocomplete="email">
+    </div>
+    <button class="btn" id="reset-btn" onclick="doReset()">
+      <div class="spinner"></div>
+      <span class="btn-text">שלח קישור לאיפוס</span>
+    </button>
+  </div>
+
+  <div class="home-link"><a href="index.html">← חזרה לדף הבית</a></div>
+</div>
+
+<script>
+var SUPABASE_URL = 'https://gmjfhjnwoymmxfqdazqf.supabase.co';
+var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
+var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ── If already logged in, route immediately ──
+sb.auth.getSession().then(function(res) {
+  if (res.data.session) routeByRole(res.data.session.user.id);
+});
+
+// ── Helpers ──
+function showMsg(txt, type) {
+  var el = document.getElementById('msg');
+  el.textContent = txt;
+  el.className = 'msg ' + (type || '');
+  el.style.display = type ? 'block' : 'none';
+}
+
+function showSection(id) {
+  document.querySelectorAll('.section').forEach(function(s){ s.classList.remove('active'); });
+  document.getElementById(id).classList.add('active');
+  showMsg('', '');
+}
+
+function setLoading(btnId, loading) {
+  var btn = document.getElementById(btnId);
+  btn.disabled = loading;
+  if (loading) btn.classList.add('loading');
+  else btn.classList.remove('loading');
+}
+
+// ── Route by role ──
+function routeByRole(uid) {
+  sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
+    if (r.error || !r.data) {
+      // no role yet — check employee_users
+      sb.from('employee_users').select('employee_id').eq('auth_user_id', uid).single().then(function(er){
+        if (er.data && er.data.employee_id) window.location.href = 'employee.html';
+        else window.location.href = 'dashboard.html'; // fallback
+      });
+      return;
+    }
+    if (r.data.role === 'manager') {
+      window.location.href = 'dashboard.html';
+    } else {
+      window.location.href = 'employee.html';
+    }
+  });
+}
+
+// ── Login ──
+function doLogin() {
+  var email = document.getElementById('login-email').value.trim();
+  var pass  = document.getElementById('login-pass').value;
+  if (!email || !pass) { showMsg('נא למלא אימייל וסיסמה', 'err'); return; }
+
+  setLoading('login-btn', true);
+  showMsg('', '');
+
+  sb.auth.signInWithPassword({ email: email, password: pass }).then(function(res) {
+    if (res.error) {
+      setLoading('login-btn', false);
+      var msg = res.error.message && res.error.message.toLowerCase().includes('invalid') ? 'אימייל או סיסמה שגויים' : 'שגיאה: ' + res.error.message;
+      showMsg(msg, 'err');
+      document.getElementById('login-pass').value = '';
+      document.getElementById('login-pass').focus();
+      return;
+    }
+    var uid = res.data.user.id;
+    // detect role and show indicator before redirect
+    sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
+      var role = r.data ? r.data.role : 'employee';
+      var pill = document.getElementById('role-pill');
+      pill.style.display = 'flex';
+      if (role === 'manager') {
+        pill.className = 'role-pill manager';
+        pill.innerHTML = '🏢 זוהית כמנהל — מעביר לדשבורד...';
+      } else {
+        pill.className = 'role-pill employee';
+        pill.innerHTML = '👤 זוהית כעובד — מעביר לפורטל עובדים...';
+      }
+      setTimeout(function() { routeByRole(uid); }, 900);
+    });
+  });
+}
+
+// ── Reset password — routes correctly after update ──
+function doReset() {
+  var email = document.getElementById('reset-email').value.trim();
+  if (!email) { showMsg('נא להכניס אימייל', 'err'); return; }
+
+  setLoading('reset-btn', true);
+  showMsg('', '');
+
+  // בדוק קודם אם האימייל רשום במערכת
+  sb.rpc('check_email_exists', { input_email: email })
+    .then(function(r) {
+      if (r.error || !r.data) {
+        setLoading('reset-btn', false);
+        showMsg('האימייל הזה אינו רשום במערכת', 'err');
+        return;
+      }
+
+      // אימייל קיים — שלח איפוס
+      sb.auth.resetPasswordForEmail(email, {
+        redirectTo: 'https://agent7.pages.dev/set-password.html'
+      }).then(function(res) {
+        setLoading('reset-btn', false);
+        if (res.error) { showMsg('שגיאה: ' + res.error.message, 'err'); return; }
+        showMsg('✅ קישור לאיפוס נשלח — בדוק את תיבת הדואר שלך', 'ok');
+        document.getElementById('reset-email').value = '';
+      });
+    });
+}
+
+// ── Keyboard enter support ──
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var active = document.querySelector('.section.active');
+  if (!active) return;
+  if (active.id === 's-login') doLogin();
+  if (active.id === 's-reset') doReset();
+});
+</script>
+</body>
+</html>

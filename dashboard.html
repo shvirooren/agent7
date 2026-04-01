@@ -2713,48 +2713,34 @@ async function trainRoleAgent(){
   }
   if(!agent){toast('שגיאה ביצירת רשומת סוכן','error');btn.disabled=false;btn.textContent='🧠 אמן';return;}
 
-  // טען זיכרון קיים
-  var existingMemRes=await sb.from('role_agent_memory').select('id,category,content,importance').eq('agent_id',agent.id).order('importance',{ascending:false}).limit(40);
-  var existingMem=existingMemRes.data||[];
-
-  var existingBlock=existingMem.length>0
-    ? '\n\nזיכרון קיים של הסוכן (אל תחזור על מידע דומה):\n'+existingMem.map(function(m,i){return'['+i+'] ['+m.category+'] '+m.content;}).join('\n')
-    : '';
-
-  var convText=_rcaHistory.map(function(m){return(m.role==='user'?'מנהל':'סוכן')+': '+m.content;}).join('\n');
-
-  var learnPrompt='נתח שיחה בין מנהל לסוכן AI בתפקיד "'+(role?role.title:'')+'".'+existingBlock+'\n\nשיחה חדשה:\n'+convText+'\n\nהחזר JSON בלבד:\n{"new_insights":[{"category":"זהות|נוהל|העדפה|תהליך|faq","content":"מידע חדש בעברית","importance":3}],"reinforce":[מספרי אינדקס מהזיכרון הקיים שהשיחה מחזקת]}\n\nכלל: new_insights יכיל רק מידע שאינו קיים כבר. reinforce יכיל אינדקסים של פריטים קיימים שאושרו שוב. אם אין מידע חדש — החזר new_insights ריק.';
-
-  var fd=new FormData();
-  fd.append('title',learnPrompt);
-  fd.append('desc','');
-  fd.append('history','[]');
-  fd.append('systemPrompt','אתה מנתח שיחות. החזר JSON בלבד ללא טקסט נוסף.');
-
   try{
-    var r=await fetch(WORKER_URL,{method:'POST',body:fd});
+    var r=await fetch(ROLE_WORKER_URL+'/role-learn',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({conversation_history:_rcaHistory,role_profile:role})
+    });
     var data=await r.json();
-    var raw=(data.result||'').trim();
-    var newInsights=[],reinforce=[];
-    try{var m=raw.match(/\{[\s\S]*\}/);if(m){var parsed=JSON.parse(m[0]);newInsights=parsed.new_insights||[];reinforce=parsed.reinforce||[];}}catch(e){}
+    var newInsights=data.insights||[];
+    var reinforce=[];
 
     var savedCount=0;
 
-    // שמור תובנות חדשות
+    // שמור תובנות חדשות + embeddings
     if(newInsights.length){
-      var inserts=newInsights.map(function(ins){return{agent_id:agent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};});
+      var contents=newInsights.map(function(ins){return ins.content||'';});
+      var embedData={};
+      try{
+        var er=await fetch(ROLE_WORKER_URL+'/embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:contents})});
+        embedData=await er.json();
+      }catch(e){}
+      var embeddings=embedData.embeddings||[];
+      var inserts=newInsights.map(function(ins,i){
+        var row={agent_id:agent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};
+        if(embeddings[i])row.embedding=JSON.stringify(embeddings[i]);
+        return row;
+      });
       await sb.from('role_agent_memory').insert(inserts);
       savedCount=newInsights.length;
-    }
-
-    // חזק פריטים קיימים — העלה חשיבות ב-1 (עד 5)
-    if(reinforce.length){
-      var toReinforce=reinforce.filter(function(i){return existingMem[i];}).map(function(i){return existingMem[i];});
-      for(var ri=0;ri<toReinforce.length;ri++){
-        var mem=toReinforce[ri];
-        var newImp=Math.min(5,(mem.importance||1)+1);
-        await sb.from('role_agent_memory').update({importance:newImp}).eq('id',mem.id);
-      }
     }
 
     await sb.from('role_agents').update({total_conversations:(agent.total_conversations||0)+1,last_updated:new Date().toISOString()}).eq('id',agent.id);
@@ -2767,7 +2753,6 @@ async function trainRoleAgent(){
     }
 
     var msg=savedCount>0?'✅ '+savedCount+' תובנות חדשות נשמרו':'✅ אין מידע חדש — הסוכן כבר יודע הכל';
-    if(reinforce.length)msg+=' · '+reinforce.length+' פריטים חוזקו';
     toast(msg,'success');
     // איפוס שיחה + הצגת סיכום למידה
     _rcaHistory=[];
@@ -2781,7 +2766,6 @@ async function trainRoleAgent(){
     } else {
       summaryHtml+='<div style="font-size:13px;color:var(--gt);text-align:center;padding:10px">✅ אין מידע חדש — הסוכן כבר יודע הכל</div>';
     }
-    if(reinforce.length>0){summaryHtml+='<div style="font-size:12px;color:var(--gr);margin-top:8px">🔁 '+reinforce.length+' פריטים קיימים חוזקו</div>';}
     summaryHtml+='<div style="font-size:11px;color:var(--gt);margin-top:10px;border-top:1px solid var(--gm);padding-top:8px">תוכל להמשיך לאמן את הסוכן</div></div>';
     box.innerHTML=summaryHtml;
     loadRoleAgents();

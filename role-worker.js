@@ -1,8 +1,8 @@
 // Agent7 — Role Agent Worker
-// Deploy this as a NEW Cloudflare Worker (e.g. agent7-roles.shvirooren.workers.dev)
-//
 // Environment variables required:
-//   ANTHROPIC_API_KEY — Claude API key
+//   ANTHROPIC_API_KEY    — Claude API key
+//   SUPABASE_URL         — Supabase project URL
+//   SUPABASE_SERVICE_KEY — Supabase service role key (for DB actions)
 
 export default {
   async fetch(request, env) {
@@ -17,15 +17,18 @@ export default {
 
     const url = new URL(request.url);
     try {
-      if (url.pathname === '/role-chat')  return await handleRoleChat(request, env, cors);
-      if (url.pathname === '/role-learn') return await handleRoleLearn(request, env, cors);
-      if (url.pathname === '/embed')      return await handleEmbed(request, env, cors);
+      if (url.pathname === '/role-chat')   return await handleRoleChat(request, env, cors);
+      if (url.pathname === '/role-learn')  return await handleRoleLearn(request, env, cors);
+      if (url.pathname === '/role-action') return await handleRoleAction(request, env, cors);
+      if (url.pathname === '/embed')       return await handleEmbed(request, env, cors);
       return new Response('Not Found', { status: 404, headers: cors });
     } catch (err) {
       return jsonRes({ error: err.message }, cors, 500);
     }
   }
 };
+
+// ─── Helpers ──────────────────────────────────────────────────
 
 function jsonRes(data, cors, status = 200) {
   return new Response(JSON.stringify(data), {
@@ -49,17 +52,74 @@ async function claude(env, system, messages, max_tokens = 1024) {
   return data.content[0].text;
 }
 
-// ─── Skills available to role agents ─────────────────────────
+// ─── Supabase REST helpers (use service key) ──────────────────
 
-const AGENT_TOOLS = [
+async function sbGet(env, table, params = {}) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), {
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase GET error: ${await res.text()}`);
+  return res.json();
+}
+
+async function sbPatch(env, table, match, data) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(match).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
+  const res = await fetch(url.toString(), {
+    method: 'PATCH',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`Supabase PATCH error: ${await res.text()}`);
+}
+
+async function sbInsert(env, table, data) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
+    method: 'POST',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=minimal'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`Supabase INSERT error: ${await res.text()}`);
+}
+
+async function verifyJwt(env, jwt) {
+  const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${jwt}`
+    }
+  });
+  if (!res.ok) return null;
+  const user = await res.json();
+  return user.id ? user : null;
+}
+
+// ─── Tool definitions ─────────────────────────────────────────
+
+const BASE_TOOLS = [
   {
     name: 'create_pdf',
-    description: 'יצור מסמך PDF עבור המשתמש. השתמש בכלי זה כאשר המשתמש מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה, או כל מסמך מובנה להורדה.',
+    description: 'יצור מסמך PDF עבור המשתמש. השתמש כאשר המשתמש מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה, או כל מסמך מובנה.',
     input_schema: {
       type: 'object',
       properties: {
         title:    { type: 'string', description: 'כותרת המסמך' },
-        subtitle: { type: 'string', description: 'כותרת משנה, תאריך, או פרטי לקוח' },
+        subtitle: { type: 'string', description: 'כותרת משנה' },
         sections: {
           type: 'array',
           items: {
@@ -67,27 +127,164 @@ const AGENT_TOOLS = [
             properties: {
               heading: { type: 'string' },
               type:    { type: 'string', enum: ['text', 'table', 'list'] },
-              content: { type: 'string', description: 'טקסט חופשי (כשtype=text)' },
-              headers: { type: 'array', items: { type: 'string' }, description: 'כותרות עמודות (כשtype=table)' },
-              rows:    { type: 'array', items: { type: 'array', items: { type: 'string' } }, description: 'שורות הטבלה' },
-              items:   { type: 'array', items: { type: 'string' }, description: 'פריטי הרשימה (כשtype=list)' }
+              content: { type: 'string' },
+              headers: { type: 'array', items: { type: 'string' } },
+              rows:    { type: 'array', items: { type: 'array', items: { type: 'string' } } },
+              items:   { type: 'array', items: { type: 'string' } }
             },
             required: ['type']
           }
         },
-        message: { type: 'string', description: 'הודעה קצרה לעובד בצ\'אט לאחר יצירת המסמך' }
+        message: { type: 'string', description: 'הודעה קצרה לאחר יצירת המסמך' }
       },
       required: ['title', 'sections', 'message']
     }
   }
 ];
 
+// Write tools, keyed by entity — only added when permission.write = true
+const WRITE_TOOLS = {
+  shipments: [
+    {
+      name: 'update_shipment_status',
+      description: 'עדכן סטטוס של משלוח. השתמש כאשר המשתמש מבקש לשנות סטטוס של משלוח.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          shipment_id:  { type: 'string', description: 'מזהה המשלוח (id) מהרשימה' },
+          status:       { type: 'string', enum: ['בדרך', 'עוכב', 'הגיע', 'נסגר'], description: 'הסטטוס החדש' },
+          description:  { type: 'string', description: 'תיאור קריא לאדם, לדוגמה: עדכון סטטוס משלוח LILY ל-הגיע' }
+        },
+        required: ['shipment_id', 'status', 'description']
+      }
+    }
+  ],
+  tasks: [
+    {
+      name: 'update_task_status',
+      description: 'עדכן סטטוס של משימה. השתמש כאשר המשתמש מבקש לסיים, להתחיל, או לסגור משימה.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          task_id:     { type: 'string', description: 'מזהה המשימה (id) מהרשימה' },
+          status:      { type: 'string', enum: ['פתוח', 'בביצוע', 'בוצע'], description: 'הסטטוס החדש' },
+          description: { type: 'string', description: 'תיאור קריא לאדם של הפעולה' }
+        },
+        required: ['task_id', 'status', 'description']
+      }
+    },
+    {
+      name: 'create_task',
+      description: 'צור משימה חדשה. השתמש כאשר המשתמש מבקש ליצור משימה.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          title:       { type: 'string', description: 'כותרת המשימה' },
+          description: { type: 'string', description: 'תיאור המשימה (אופציונלי)' },
+          priority:    { type: 'string', enum: ['רגיל', 'בינוני', 'דחוף'], description: 'עדיפות' },
+          readable_description: { type: 'string', description: 'תיאור קריא לאדם, לדוגמה: יצירת משימה: בדיקת מלאי' }
+        },
+        required: ['title', 'readable_description']
+      }
+    }
+  ]
+};
+
+// Maps action_type → required permission
+const ACTION_PERMISSIONS = {
+  update_shipment_status: { entity: 'shipments', op: 'write' },
+  update_task_status:     { entity: 'tasks',     op: 'write' },
+  create_task:            { entity: 'tasks',     op: 'write' }
+};
+
 // ─── POST /role-chat ──────────────────────────────────────────
 
 async function handleRoleChat(request, env, cors) {
-  const { role_profile, memory, conversation_history, new_message, today } = await request.json();
+  const { role_profile, memory, conversation_history, new_message, today, permissions, manager_id } = await request.json();
 
   if (!new_message) return jsonRes({ error: 'new_message is required' }, cors, 400);
+
+  // Fetch live data for read-permitted entities
+  let liveDataBlock = '';
+  if (manager_id && permissions && env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
+    const parts = [];
+
+    if (permissions.shipments?.read) {
+      try {
+        const ships = await sbGet(env, 'shipments', {
+          select: 'id,supplier,carrier,status,tracking_number,origin_country,destination,departure_date,arrival_date',
+          user_id: `eq.${manager_id}`,
+          order: 'created_at.desc',
+          limit: '40'
+        });
+        if (ships.length) {
+          parts.push('משלוחים:\n' + ships.map(s =>
+            `[id:${s.id}] ${s.supplier||'-'} | ${s.carrier||'-'} | סטטוס:${s.status} | מעקב:${s.tracking_number||'-'} | מ:${s.origin_country||'-'} ל:${s.destination||'-'} | יציאה:${s.departure_date||'-'} הגעה:${s.arrival_date||'-'}`
+          ).join('\n'));
+        }
+      } catch(e) {}
+    }
+
+    if (permissions.tasks?.read) {
+      try {
+        const tasks = await sbGet(env, 'tasks', {
+          select: 'id,title,status,priority',
+          user_id: `eq.${manager_id}`,
+          order: 'created_at.desc',
+          limit: '40'
+        });
+        if (tasks.length) {
+          parts.push('משימות:\n' + tasks.map(t =>
+            `[id:${t.id}] ${t.title} | סטטוס:${t.status} | עדיפות:${t.priority}`
+          ).join('\n'));
+        }
+      } catch(e) {}
+    }
+
+    if (permissions.quotes?.read) {
+      try {
+        const quotes = await sbGet(env, 'quotes', {
+          select: 'id,client_name,status,total',
+          user_id: `eq.${manager_id}`,
+          order: 'created_at.desc',
+          limit: '20'
+        });
+        if (quotes.length) {
+          parts.push('הצעות מחיר:\n' + quotes.map(q =>
+            `[id:${q.id}] ${q.client_name} | סטטוס:${q.status} | סכום:₪${q.total||0}`
+          ).join('\n'));
+        }
+      } catch(e) {}
+    }
+
+    if (permissions.orders?.read) {
+      try {
+        const orders = await sbGet(env, 'orders', {
+          select: 'id,client_name,type,status,total',
+          user_id: `eq.${manager_id}`,
+          order: 'created_at.desc',
+          limit: '20'
+        });
+        if (orders.length) {
+          parts.push('הזמנות:\n' + orders.map(o =>
+            `[id:${o.id}] ${o.client_name} | סוג:${o.type} | סטטוס:${o.status} | סכום:₪${o.total||0}`
+          ).join('\n'));
+        }
+      } catch(e) {}
+    }
+
+    if (parts.length) liveDataBlock = '\n\n--- נתונים עדכניים מהמערכת ---\n' + parts.join('\n\n');
+  }
+
+  // Build tools list based on permissions
+  const tools = [...BASE_TOOLS];
+  if (permissions) {
+    Object.entries(WRITE_TOOLS).forEach(([entity, entityTools]) => {
+      if (permissions[entity]?.write) tools.push(...entityTools);
+    });
+  }
+
+  const hasWritePerms = permissions && Object.values(permissions).some(p => p?.write);
 
   let memoryBlock = '';
   if (memory && memory.length > 0) {
@@ -95,20 +292,22 @@ async function handleRoleChat(request, env, cors) {
     memoryBlock = '\n\nידע שנצבר מניסיון קודם:\n' + top.map(m => `• [${m.category}] ${m.content}`).join('\n');
   }
 
-  const knowledgeBlock = role_profile.knowledge ? `\n\nבסיס ידע:\n${role_profile.knowledge}` : '';
-  const customBlock = role_profile.system_prompt ? `\n\nהוראות מיוחדות:\n${role_profile.system_prompt}` : '';
+  const knowledgeBlock  = role_profile.knowledge     ? `\n\nבסיס ידע:\n${role_profile.knowledge}` : '';
+  const customBlock     = role_profile.system_prompt ? `\n\nהוראות מיוחדות:\n${role_profile.system_prompt}` : '';
+  const writeInstruction = hasWritePerms
+    ? '\n- כשהמשתמש מבקש לעדכן נתונים (סטטוס משלוח, משימה וכו\') — השתמש בכלי המתאים. אל תאמר שאתה מבצע פעולה בטקסט בלבד.'
+    : '';
 
   const system = `אתה סוכן AI מקצועי של תפקיד "${role_profile.title}" בחברת "${role_profile.company_name}".
 
 תיאור התפקיד: ${role_profile.description || 'לא צוין'}
-אחריות ומשימות: ${role_profile.responsibilities || 'לא צוין'}${memoryBlock}${knowledgeBlock}${customBlock}
+אחריות ומשימות: ${role_profile.responsibilities || 'לא צוין'}${memoryBlock}${knowledgeBlock}${customBlock}${liveDataBlock}
 
 כללים:
-- אתה עוזר לכל מי שממלא תפקיד זה. הידע שלך שייך לתפקיד, לא לאדם ספציפי.
 - ענה תמיד בעברית אלא אם מבקשים אחרת.
 - היה ממוקד, מקצועי ומועיל.
 - אם אין לך מידע, אמור זאת בכנות.
-- כשמישהו מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה או כל מסמך — השתמש תמיד בכלי create_pdf.
+- כשמישהו מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה או מסמך — השתמש בכלי create_pdf.${writeInstruction}
 - התאריך של היום הוא: ${today || new Date().toLocaleDateString('he-IL')}.`;
 
   const messages = [
@@ -123,26 +322,103 @@ async function handleRoleChat(request, env, cors) {
       'x-api-key': env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2048, system, tools: AGENT_TOOLS, messages })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2048, system, tools, messages })
   });
 
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || 'Claude API error');
 
-  // Tool use — PDF
   if (data.stop_reason === 'tool_use') {
     const toolUse = data.content.find(c => c.type === 'tool_use');
-    if (toolUse && toolUse.name === 'create_pdf') {
+    if (toolUse) {
+      // PDF tool
+      if (toolUse.name === 'create_pdf') {
+        return jsonRes({
+          reply: toolUse.input.message || 'המסמך מוכן.',
+          action: { type: 'create_pdf', data: toolUse.input }
+        }, cors);
+      }
+      // DB write tool — return for client confirmation
+      const textContent = data.content.find(c => c.type === 'text');
       return jsonRes({
-        reply: toolUse.input.message || 'המסמך מוכן.',
-        action: { type: 'create_pdf', data: toolUse.input }
+        reply: textContent?.text || 'מצאתי את הפעולה הנדרשת. אנא אשר.',
+        db_action: {
+          type: toolUse.name,
+          params: toolUse.input,
+          description: toolUse.input.readable_description || toolUse.input.description || toolUse.name
+        }
       }, cors);
     }
   }
 
-  // Normal reply
   const reply = data.content.find(c => c.type === 'text')?.text || '';
   return jsonRes({ reply }, cors);
+}
+
+// ─── POST /role-action ────────────────────────────────────────
+
+async function handleRoleAction(request, env, cors) {
+  if (!env.SUPABASE_URL || !env.SUPABASE_SERVICE_KEY) {
+    return jsonRes({ error: 'Worker not configured for DB actions' }, cors, 500);
+  }
+
+  const { action_type, params, role_id, manager_id, employee_jwt } = await request.json();
+
+  if (!action_type || !role_id || !manager_id || !employee_jwt) {
+    return jsonRes({ error: 'חסרים פרמטרים' }, cors, 400);
+  }
+
+  // 1. Verify employee JWT
+  const user = await verifyJwt(env, employee_jwt);
+  if (!user) return jsonRes({ error: 'הפגישה פגה — אנא התחבר מחדש' }, cors, 401);
+
+  // 2. Fetch permissions from DB (server-side — never trust client)
+  const roles = await sbGet(env, 'job_roles', {
+    select: 'permissions',
+    id: `eq.${role_id}`,
+    user_id: `eq.${manager_id}`
+  });
+  if (!roles.length) return jsonRes({ error: 'תפקיד לא נמצא' }, cors, 403);
+  const permissions = roles[0].permissions || {};
+
+  // 3. Validate permission
+  const required = ACTION_PERMISSIONS[action_type];
+  if (!required) return jsonRes({ error: 'פעולה לא מוכרת' }, cors, 400);
+  if (!permissions[required.entity]?.[required.op]) {
+    return jsonRes({ error: 'אין הרשאה לפעולה זו' }, cors, 403);
+  }
+
+  // 4. Execute — always filter by manager_id for tenant isolation
+  switch (action_type) {
+    case 'update_shipment_status': {
+      await sbPatch(env, 'shipments',
+        { id: params.shipment_id, user_id: manager_id },
+        { status: params.status, updated_at: new Date().toISOString() }
+      );
+      return jsonRes({ success: true, message: `סטטוס המשלוח עודכן ל-${params.status}` }, cors);
+    }
+    case 'update_task_status': {
+      await sbPatch(env, 'tasks',
+        { id: params.task_id, user_id: manager_id },
+        { status: params.status, updated_at: new Date().toISOString() }
+      );
+      return jsonRes({ success: true, message: `סטטוס המשימה עודכן ל-${params.status}` }, cors);
+    }
+    case 'create_task': {
+      await sbInsert(env, 'tasks', {
+        user_id: manager_id,
+        title: params.title,
+        description: params.description || '',
+        priority: params.priority || 'רגיל',
+        status: 'פתוח',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+      return jsonRes({ success: true, message: `משימה נוצרה: ${params.title}` }, cors);
+    }
+    default:
+      return jsonRes({ error: 'פעולה לא ממומשת' }, cors, 400);
+  }
 }
 
 // ─── POST /embed ──────────────────────────────────────────────

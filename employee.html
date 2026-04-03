@@ -175,7 +175,7 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
 @media(max-width:600px){.cnt{padding:16px}}
 @media(max-width:480px){
   .cnt{padding:12px 14px}
-  .srow{gap:8px}
+  .srow{gap:8px;grid-template-columns:repeat(2,1fr)}
   .sc{padding:12px 10px}
   .scv{font-size:22px}
   .scl{font-size:10px}
@@ -189,6 +189,9 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
   .vtbtn{min-height:32px}
   .bout{padding:8px 12px;min-height:36px}
   .greeting h1{font-size:18px}
+}
+@media(max-width:380px){
+  .srow{grid-template-columns:1fr}
 }
 </style>
 </head>
@@ -274,6 +277,19 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
   </div>
   </div><!-- /tasks-view -->
 
+  <!-- DB Action Confirmation Modal -->
+  <div id="db-action-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:400;align-items:center;justify-content:center">
+    <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:420px;margin:16px;direction:rtl;box-shadow:0 24px 80px rgba(0,0,0,.25)">
+      <div style="font-size:22px;text-align:center;margin-bottom:12px">🤖</div>
+      <div style="font-size:15px;font-weight:700;color:var(--bd);margin-bottom:8px;text-align:center">הסוכן מבקש לבצע פעולה</div>
+      <div id="db-action-desc" style="background:var(--gl);border:1px solid var(--gm);border-radius:8px;padding:12px 16px;font-size:14px;color:var(--td);margin-bottom:20px;text-align:center;line-height:1.6"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="confirmDbAction()" style="flex:1;background:var(--gr);color:#fff;border:none;padding:11px;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:Heebo,sans-serif" id="db-confirm-btn">✓ אשר ובצע</button>
+        <button onclick="cancelDbAction()" style="flex:1;background:var(--gl);color:var(--td);border:1px solid var(--gm);padding:11px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:Heebo,sans-serif">✕ בטל</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Agent View -->
   <div id="agent-panel" style="display:none;flex-direction:column;height:calc(100vh - 200px);min-height:420px;background:#fff;border:1.5px solid var(--gm);border-radius:12px;overflow:hidden">
     <div class="agent-chat-header">
@@ -319,6 +335,7 @@ function esc(str){if(str==null)return '';var d=document.createElement('div');d.t
   c.style.cssText='position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:9999;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none';
   document.addEventListener('DOMContentLoaded',function(){document.body.appendChild(c);});
   var KF={success:{bg:'#DCFCE7',color:'#15803d',border:'#86EFAC',icon:'✓'},error:{bg:'#FEE2E2',color:'#DC2626',border:'#FCA5A5',icon:'✕'},warning:{bg:'#FEF3C7',color:'#D97706',border:'#FDE68A',icon:'⚠'},info:{bg:'#E8F4FC',color:'#0055A4',border:'#BAE6FD',icon:'ℹ'}};
+  window.dbErr=function(r,msg){if(r&&r.error){window.toast(msg||'שגיאה: '+r.error.message,'error');return true;}return false;};
   window.toast=function(msg,type,dur){
     dur=dur||3200;var k=KF[type]||KF.info;
     var el=document.createElement('div');
@@ -338,7 +355,7 @@ function skeletonCards(n){
 // ═══════════════════════════
 //  STATE
 // ═══════════════════════════
-var CU=null, EMP_ID=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null;
+var CU=null, EMP_ID=null, MANAGER_ID=null, SESSION_JWT=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null;
 var pendingStatusUpdate={};  // taskId → true  (debounce double-clicks)
 
 // ── Greeting ──
@@ -352,6 +369,7 @@ document.getElementById('greeting-date').textContent=now.toLocaleDateString('he-
 sb.auth.getSession().then(function(r){
   if(!r.data.session){window.location.href='login.html';return;}
   CU=r.data.session.user;
+  SESSION_JWT=r.data.session.access_token;
   // Show user initials immediately
   var nm=CU.user_metadata&&CU.user_metadata.full_name?CU.user_metadata.full_name:CU.email;
   document.getElementById('unm').textContent=esc(nm);
@@ -378,10 +396,12 @@ function getEmployeeId(){
       return;
     }
     EMP_ID=r.data.employee_id;
+    MANAGER_ID=r.data.manager_id;
 
     // Company name (non-blocking)
     if(r.data.manager_id){
       sb.from('companies').select('company_name').eq('manager_id',r.data.manager_id).single().then(function(cr){
+        if(cr.error&&cr.error.code!=='PGRST116')return;
         if(cr.data&&cr.data.company_name){
           document.getElementById('company-name-text').textContent=esc(cr.data.company_name);
           document.getElementById('company-name-emp').style.display='inline-flex';
@@ -422,6 +442,7 @@ function loadTasks(){
       sb.from('files').select('id,file_name,file_url,task_id').eq('employee_id',EMP_ID)
         .then(function(fr){
           var fm={};
+          if(fr.error){renderTasks({});return;}
           if(fr.data)fr.data.forEach(function(f){if(f.task_id){if(!fm[f.task_id])fm[f.task_id]=[];fm[f.task_id].push(f);}});
           allTasks=allTasks.map(function(t){t.files=fm[t.id]||[];return t;});
           // Sort: open first, in-progress, done last
@@ -632,8 +653,8 @@ function switchTab(tab){
 // ══════════════════════════════════════════
 //  ROLE AGENT — הסוכן שלי
 // ══════════════════════════════════════════
-var ROLE_WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
-var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false;
+var WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
+var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false, roleKnowledge='';
 
 function loadRoleAgent(){
   if(!EMP_ID)return;
@@ -652,16 +673,20 @@ function loadRoleAgent(){
     document.getElementById('chat-welcome-title').textContent='שלום!';
     document.getElementById('chat-welcome-text').textContent='אני הסוכן של תפקיד "'+esc(roleProfile.title)+'". שאל אותי כל שאלה הקשורה לתפקיד שלך.';
 
-    // טוען סוכן וזיכרון
+    // טוען סוכן, זיכרון, וידע ייעודי
     sb.from('role_agents').select('*').eq('role_id',emp.role_id).maybeSingle().then(function(ar){
       roleAgent=ar.data;
       if(roleAgent){
-        sb.from('role_agent_memory').select('*').eq('agent_id',roleAgent.id).order('importance',{ascending:false}).limit(40).then(function(mr){
-          roleMemory=mr.data||[];
-        });
-        // פתח שיחה חדשה
         sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){
+          if(cr.error){toast('שגיאה ביצירת שיחה','error');return;}
           if(cr.data)roleConvId=cr.data.id;
+        });
+      }
+      // טוען knowledge base ייעודי לתפקיד זה
+      if(roleProfile&&emp.role_id){
+        sb.from('role_knowledge').select('content').eq('role_id',emp.role_id).maybeSingle().then(function(kr){
+          if(kr.error)return;
+          if(kr.data&&kr.data.content)roleKnowledge=kr.data.content;
         });
       }
     });
@@ -682,7 +707,7 @@ function sendRoleMessage(){
   roleConvHistory.push({role:'user',content:msg});
 
   // שמור ל-DB
-  if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'user',content:msg});
+  if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'user',content:msg}).then(function(r){if(r.error)toast('שגיאה בשמירת הודעה','error');});
 
   showTyping(true);
   document.getElementById('agent-send-btn').disabled=true;
@@ -692,28 +717,67 @@ function sendRoleMessage(){
   var cnEl=document.getElementById('company-name-text');
   if(cnEl)companyName=cnEl.textContent||'';
 
-  fetch(ROLE_WORKER_URL+'/role-chat',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      role_profile:{title:roleProfile.title,description:roleProfile.description||'',responsibilities:roleProfile.responsibilities||'',company_name:companyName},
-      memory:roleMemory,
-      conversation_history:roleConvHistory.slice(-20),
-      new_message:msg
-    })
-  }).then(function(r){return r.json();}).then(function(data){
+  var roleProfilePayload={
+    title:roleProfile.title,
+    description:roleProfile.description||'',
+    responsibilities:roleProfile.responsibilities||'',
+    system_prompt:roleProfile.system_prompt||'',
+    company_name:companyName,
+    knowledge:roleKnowledge?roleKnowledge.substring(0,50000):''
+  };
+
+  // חיפוש סמנטי — מצא זיכרונות רלוונטיים להודעה הנוכחית
+  function doChat(relevantMemory){
+    fetch(WORKER_URL+'/role-chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        role_profile:roleProfilePayload,
+        memory:relevantMemory,
+        conversation_history:roleConvHistory.slice(-20),
+        new_message:msg,
+        today:new Date().toLocaleDateString('he-IL',{year:'numeric',month:'long',day:'numeric'}),
+        permissions:roleProfile.permissions||{},
+        manager_id:MANAGER_ID
+      })
+    }).then(function(r){return r.json();}).then(function(data){
     showTyping(false);
-    var reply=data.reply||'מצטערת, הייתה שגיאה.';
+    var reply=(data.reply||data.error||'מצטערת, הייתה שגיאה.').trim();
     roleConvHistory.push({role:'assistant',content:reply});
     addChatMsg('assistant',reply);
-    if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'assistant',content:reply});
-  }).catch(function(){
-    showTyping(false);
-    addChatMsg('assistant','מצטערת, הייתה שגיאה. אנא נסה שוב.');
-  }).finally(function(){
-    roleLoading=false;
-    document.getElementById('agent-send-btn').disabled=false;
-  });
+    if(data.action&&data.action.type==='create_pdf') addPdfDownloadBtn(data.action.data);
+    if(data.db_action) showDbActionConfirm(data.db_action);
+    if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'assistant',content:reply}).then(function(r){if(r.error)console.warn('שגיאה בשמירת תשובה:',r.error.message);});
+    }).catch(function(){
+      showTyping(false);
+      addChatMsg('assistant','מצטערת, הייתה שגיאה. אנא נסה שוב.');
+    }).finally(function(){
+      roleLoading=false;
+      document.getElementById('agent-send-btn').disabled=false;
+    });
+  }
+
+  if(roleAgent){
+    // תמיד טען זיכרוני זהות והעדפות + חיפוש סמנטי לשאלה
+    var pinned=sb.from('role_agent_memory').select('id,content,category,importance')
+      .eq('agent_id',roleAgent.id).in('category',['זהות','העדפה','contact'])
+      .or('employee_id.is.null,employee_id.eq.'+EMP_ID)
+      .order('importance',{ascending:false}).limit(10);
+    var semantic=fetch(WORKER_URL+'/embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:[msg]})})
+      .then(function(r){return r.json();}).then(function(ed){
+        var emb=ed.embeddings&&ed.embeddings[0];
+        if(!emb)return[];
+        return sb.rpc('match_memories',{query_embedding:emb,match_agent_id:roleAgent.id,match_employee_id:EMP_ID,match_count:10}).then(function(mr){return mr.data||[];});
+      }).catch(function(){return[];});
+    Promise.all([pinned,semantic]).then(function(res){
+      var base=res[0].data||[];
+      var found=res[1];
+      var baseIds=new Set(base.map(function(m){return m.id;}));
+      doChat(base.concat(found.filter(function(m){return !baseIds.has(m.id);})));
+    }).catch(function(){doChat([]);});
+  } else {
+    doChat([]);
+  }
 }
 
 function addChatMsg(role,content){
@@ -726,6 +790,63 @@ function addChatMsg(role,content){
   div.innerHTML='<div class="cmsg-av">'+av+'</div><div><div class="cmsg-bubble">'+esc(content).replace(/\n/g,'<br>')+'</div><div style="font-size:11px;color:var(--gt);margin-top:3px;text-align:center">'+time+'</div></div>';
   area.insertBefore(div,typing);
   area.scrollTop=area.scrollHeight;
+}
+
+function addPdfDownloadBtn(pdfData){
+  var area=document.getElementById('chat-messages');
+  var typing=document.getElementById('typing-dots');
+  var div=document.createElement('div');
+  div.className='cmsg assistant';
+  div.innerHTML='<div class="cmsg-av">🤖</div><div><div class="cmsg-bubble" style="background:var(--bp);border:1.5px solid var(--bm);padding:14px 16px"><div style="font-size:13px;font-weight:700;color:var(--bd);margin-bottom:10px">📄 '+esc(pdfData.title)+'</div><button onclick="generatePdf(this)" style="background:var(--bm);color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">הורד PDF</button></div></div>';
+  div.querySelector('button').pdfData=pdfData;
+  area.insertBefore(div,typing);
+  area.scrollTop=area.scrollHeight;
+}
+
+function generatePdf(btn){
+  var d=btn.pdfData;
+  var company=document.getElementById('company-name-text');
+  var companyName=company?company.textContent:'';
+  var date=new Date().toLocaleDateString('he-IL');
+
+  var sectionsHtml=d.sections.map(function(s){
+    var h=s.heading?'<h3 style="font-size:15px;font-weight:800;color:#003366;margin:0 0 10px;border-bottom:1px solid #E2E8EF;padding-bottom:6px">'+s.heading+'</h3>':'';
+    if(s.type==='table'&&s.headers&&s.rows){
+      var th=s.headers.map(function(c){return'<th style="background:#003366;color:#fff;padding:9px 14px;font-size:13px;font-weight:700;text-align:right">'+c+'</th>';}).join('');
+      var tr=s.rows.map(function(row,i){
+        var bg=i%2===0?'#fff':'#F5F7FA';
+        var td=row.map(function(c){return'<td style="padding:9px 14px;font-size:13px;border-bottom:1px solid #E2E8EF">'+c+'</td>';}).join('');
+        return'<tr style="background:'+bg+'">'+td+'</tr>';
+      }).join('');
+      return'<div style="margin-bottom:24px">'+h+'<table style="width:100%;border-collapse:collapse;border:1px solid #E2E8EF;border-radius:8px;overflow:hidden"><thead><tr>'+th+'</tr></thead><tbody>'+tr+'</tbody></table></div>';
+    }
+    if(s.type==='list'&&s.items){
+      var li=s.items.map(function(item){return'<li style="padding:5px 0;font-size:14px;color:#1A2B3C">'+item+'</li>';}).join('');
+      return'<div style="margin-bottom:24px">'+h+'<ul style="padding-right:20px;margin:0">'+li+'</ul></div>';
+    }
+    return'<div style="margin-bottom:24px">'+h+(s.content?'<p style="font-size:14px;color:#1A2B3C;line-height:1.8;white-space:pre-wrap">'+s.content+'</p>':'')+'</div>';
+  }).join('');
+
+  var html='<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>'+d.title+'</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Heebo:wght@400;600;700;800;900&display=swap" rel="stylesheet">'
+    +'<style>*{margin:0;padding:0;box-sizing:border-box}body{font-family:Heebo,Arial,sans-serif;background:#fff;color:#1A2B3C;direction:rtl;padding:40px}'
+    +'@media print{body{padding:0}button{display:none!important}.print-hide{display:none!important}}'
+    +'</style></head><body>'
+    +'<div style="max-width:800px;margin:0 auto">'
+    +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #003366">'
+    +'<div><div style="font-size:28px;font-weight:900;color:#003366;margin-bottom:4px">'+d.title+'</div>'+(d.subtitle?'<div style="font-size:14px;color:#5A6A7A">'+d.subtitle+'</div>':'')+'</div>'
+    +'<div style="text-align:left"><div style="font-size:15px;font-weight:800;color:#003366">'+esc(companyName)+'</div><div style="font-size:13px;color:#5A6A7A">'+date+'</div></div></div>'
+    +sectionsHtml
+    +'<div style="margin-top:40px;padding-top:16px;border-top:1px solid #E2E8EF;font-size:11px;color:#5A6A7A;text-align:center">נוצר על ידי Agent 7 · '+date+'</div>'
+    +'<div class="print-hide" style="text-align:center;margin-top:28px;padding:16px;background:#F5F7FA;border-radius:8px;font-size:14px;color:#5A6A7A">להורדת PDF: לחץ <strong style="color:#003366">Ctrl+P</strong> (מחשב) או <strong style="color:#003366">⌘+P</strong> (Mac) ← בחר "שמור כ-PDF"</div>'
+    +'</div></body></html>';
+
+  var w=window.open('','_blank');
+  if(!w){toast('אנא אפשר חלונות קופצים בדפדפן','warning');return;}
+  w.document.write(html);
+  w.document.close();
+  var inp=document.getElementById('agent-input');
+  if(inp)inp.focus();
 }
 
 function showTyping(show){
@@ -741,31 +862,49 @@ function endRoleConversation(){
   btn.disabled=true;btn.textContent='שומר...';
 
   // סגור שיחה ב-DB
-  if(roleConvId)sb.from('role_conversations').update({ended_at:new Date().toISOString()}).eq('id',roleConvId);
+  if(roleConvId)sb.from('role_conversations').update({ended_at:new Date().toISOString()}).eq('id',roleConvId).then(function(r){if(r.error)toast('שגיאה בסגירת שיחה','error');});
 
-  fetch(ROLE_WORKER_URL+'/role-learn',{
+  fetch(WORKER_URL+'/role-learn',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({
-      conversation_history:roleConvHistory,
-      role_profile:{title:roleProfile?roleProfile.title:'',description:roleProfile?roleProfile.description:'',responsibilities:roleProfile?roleProfile.responsibilities:''}
-    })
+    body:JSON.stringify({conversation_history:roleConvHistory,role_profile:roleProfile})
   }).then(function(r){return r.json();}).then(function(data){
     var insights=data.insights||[];
-    var saved=0;
-    if(roleAgent&&insights.length){
-      var inserts=insights.map(function(ins){return {agent_id:roleAgent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};});
-      sb.from('role_agent_memory').insert(inserts).then(function(){
-        sb.from('role_agents').update({total_conversations:(roleAgent.total_conversations||0)+1,last_updated:new Date().toISOString()}).eq('id',roleAgent.id);
-      });
-      saved=inserts.length;
+    function finishConv(savedCount){
+      toast('השיחה נשמרה! '+(savedCount?savedCount+' תובנות נוספו לסוכן.':''),'success');
+      roleConvHistory=[];roleConvId=null;
+      document.querySelectorAll('.cmsg').forEach(function(m){m.remove();});
+      document.getElementById('chat-welcome').style.display='block';
+      if(roleAgent)sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){if(!cr.error&&cr.data)roleConvId=cr.data.id;});
     }
-    toast('השיחה נשמרה! '+(saved?saved+' תובנות נוספו לסוכן.':''),'success');
-    // איפוס לשיחה חדשה
-    roleConvHistory=[];roleConvId=null;
-    document.querySelectorAll('.cmsg').forEach(function(m){m.remove();});
-    document.getElementById('chat-welcome').style.display='block';
-    if(roleAgent)sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){if(cr.data)roleConvId=cr.data.id;});
+    if(roleAgent&&insights.length){
+      var contents=insights.map(function(ins){return ins.content||'';});
+      fetch(WORKER_URL+'/embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:contents})})
+        .then(function(r){return r.json();}).catch(function(){return{};})
+        .then(function(ed){
+          var embeddings=ed.embeddings||[];
+          var personalCategories=['זהות','העדפה'];
+          var inserts=insights.map(function(ins,i){
+            var row={agent_id:roleAgent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};
+            if(embeddings[i])row.embedding=JSON.stringify(embeddings[i]);
+            if(personalCategories.indexOf(ins.category)!==-1)row.employee_id=EMP_ID;
+            return row;
+          });
+          sb.from('role_agent_memory').insert(inserts).then(function(ir){
+            if(ir.error){console.error('role_agent_memory insert error:',ir.error);toast('שגיאה בשמירת תובנות: '+ir.error.message,'error');finishConv(0);return;}
+            sb.from('role_agents').update({total_conversations:(roleAgent.total_conversations||0)+1,last_updated:new Date().toISOString()}).eq('id',roleAgent.id);
+            sb.from('role_agent_memory').select('id,importance,created_at').eq('agent_id',roleAgent.id).order('importance',{ascending:false}).order('created_at',{ascending:false}).then(function(allMem){
+              if(allMem.data&&allMem.data.length>60){
+                var toDelete=allMem.data.slice(60).map(function(m){return m.id;});
+                sb.from('role_agent_memory').delete().in('id',toDelete);
+              }
+            });
+            finishConv(inserts.length);
+          });
+        });
+    } else {
+      finishConv(0);
+    }
   }).catch(function(){
     toast('שגיאה בשמירת השיחה','error');
   }).finally(function(){
@@ -778,6 +917,56 @@ var agentInput=document.getElementById('agent-input');
 if(agentInput){
   agentInput.addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,100)+'px';});
   agentInput.addEventListener('keydown',function(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendRoleMessage();}});
+}
+
+// ── DB Action Confirmation ──
+var _pendingDbAction=null;
+
+function showDbActionConfirm(dbAction){
+  _pendingDbAction=dbAction;
+  document.getElementById('db-action-desc').textContent=dbAction.description||dbAction.type;
+  document.getElementById('db-action-modal').style.display='flex';
+}
+
+function cancelDbAction(){
+  _pendingDbAction=null;
+  document.getElementById('db-action-modal').style.display='none';
+  toast('הפעולה בוטלה','info');
+}
+
+function confirmDbAction(){
+  if(!_pendingDbAction)return;
+  var btn=document.getElementById('db-confirm-btn');
+  btn.disabled=true; btn.textContent='מבצע...';
+  // Refresh JWT before sending
+  sb.auth.getSession().then(function(sr){
+    var jwt=sr.data&&sr.data.session?sr.data.session.access_token:SESSION_JWT;
+    fetch(WORKER_URL+'/role-action',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        action_type:_pendingDbAction.type,
+        params:_pendingDbAction.params,
+        role_id:roleProfile.id,
+        manager_id:MANAGER_ID,
+        employee_jwt:jwt
+      })
+    }).then(function(r){return r.json();}).then(function(data){
+      document.getElementById('db-action-modal').style.display='none';
+      _pendingDbAction=null;
+      if(data.success){
+        toast(data.message||'הפעולה בוצעה ✓','success');
+        addChatMsg('assistant','✅ '+( data.message||'הפעולה בוצעה בהצלחה'));
+        roleConvHistory.push({role:'assistant',content:'✅ '+(data.message||'הפעולה בוצעה בהצלחה')});
+      } else {
+        toast(data.error||'שגיאה בביצוע הפעולה','error');
+      }
+    }).catch(function(){
+      toast('שגיאת רשת — הפעולה לא בוצעה','error');
+    }).finally(function(){
+      btn.disabled=false; btn.textContent='✓ אשר ובצע';
+    });
+  });
 }
 </script>
 </body>

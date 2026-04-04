@@ -2561,6 +2561,14 @@ function loadRoleAgents(){
         h+='</div>';
       });
       grid.innerHTML=h;
+
+      // פתח צ'אט אוטומטית אם הגענו מ-agent-setup
+      var openRoleId=new URLSearchParams(window.location.search).get('open_role');
+      if(openRoleId){
+        var btn=document.querySelector('[data-role-id="'+openRoleId+'"]');
+        if(btn)openRoleChat(btn);
+        history.replaceState(null,'',window.location.pathname);
+      }
     });
   });
 }

@@ -480,7 +480,7 @@ async function animateStep(id, progress, delay) {
 }
 
 // ── Navigation ────────────────────────────────────────────────
-function goDashboard() { window.location.href = 'dashboard.html'; }
+function goDashboard() { window.location.href = 'dashboard.html?open_role=' + encodeURIComponent(selectedRoleId); }
 
 function goAgain() {
   files = [];

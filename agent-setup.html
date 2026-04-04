@@ -496,7 +496,7 @@ async function startProcessing() {
   var firstIndex = true;
 
   // ── קבצים: העלאה ל-Storage (שמירה) + אינדוקס ישיר מ-content (בגושים) ──
-  var BATCH = 300000;
+  var BATCH = 100000;
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     var content = f.content;
@@ -551,7 +551,7 @@ async function startProcessing() {
 
   // ── טקסט הדבוק — שלח ישירות כ-content ──
   if (paste) {
-    var BATCH = 300000;
+    var BATCH = 100000;
     try {
       for (var bi = 0; bi < paste.length; bi += BATCH) {
         var res = await fetch(ROLE_WORKER_URL + '/role-index', {

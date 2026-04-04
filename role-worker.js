@@ -603,8 +603,8 @@ async function handleRoleIndex(request, env, cors) {
     } catch(e) {}
   }
 
-  // 5. Embed in batches of 50 to avoid Worker timeouts
-  const EMBED_BATCH = 50;
+  // 5. Embed in batches of 20 to avoid Worker timeouts
+  const EMBED_BATCH = 20;
   const allEmbeddings = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
     const batch = chunks.slice(i, i + EMBED_BATCH);

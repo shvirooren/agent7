@@ -19,6 +19,8 @@ export default {
     try {
       if (url.pathname === '/role-chat')   return await handleRoleChat(request, env, cors);
       if (url.pathname === '/role-learn')  return await handleRoleLearn(request, env, cors);
+      if (url.pathname === '/role-save')   return await handleRoleSave(request, env, cors);
+      if (url.pathname === '/role-index')  return await handleRoleIndex(request, env, cors);
       if (url.pathname === '/role-action') return await handleRoleAction(request, env, cors);
       if (url.pathname === '/embed')       return await handleEmbed(request, env, cors);
       return new Response('Not Found', { status: 404, headers: cors });
@@ -56,7 +58,10 @@ async function claude(env, system, messages, max_tokens = 1024) {
 
 async function sbGet(env, table, params = {}) {
   const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
-  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const noPrefix = new Set(['select', 'order', 'limit', 'offset']);
+  Object.entries(params).forEach(([k, v]) => {
+    url.searchParams.set(k, noPrefix.has(k) ? v : `eq.${v}`);
+  });
   const res = await fetch(url.toString(), {
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,
@@ -83,8 +88,55 @@ async function sbPatch(env, table, match, data) {
   if (!res.ok) throw new Error(`Supabase PATCH error: ${await res.text()}`);
 }
 
+async function sbDelete(env, table, match) {
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  Object.entries(match).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE error: ${await res.text()}`);
+}
+
+async function sbRpc(env, fn, params) {
+  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+    method: 'POST',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(params)
+  });
+  if (!res.ok) throw new Error(`Supabase RPC error: ${await res.text()}`);
+  return res.json();
+}
+
+// Split text into ~500-word chunks, preferring paragraph breaks
+function chunkText(text, wordsPerChunk = 500) {
+  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  const chunks = [];
+  let current = [];
+  let wordCount = 0;
+  for (const para of paragraphs) {
+    const words = para.split(/\s+/).length;
+    if (wordCount + words > wordsPerChunk && current.length) {
+      chunks.push(current.join('\n\n'));
+      current = [];
+      wordCount = 0;
+    }
+    current.push(para);
+    wordCount += words;
+  }
+  if (current.length) chunks.push(current.join('\n\n'));
+  return chunks;
+}
+
 async function sbInsert(env, table, data) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/${table}`, {
+  const res = await fetch(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`, {
     method: 'POST',
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,
@@ -98,7 +150,8 @@ async function sbInsert(env, table, data) {
 }
 
 async function verifyJwt(env, jwt) {
-  const res = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+  const url = `${env.SUPABASE_URL.trim()}/auth/v1/user`;
+  const res = await fetch(url, {
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,
       'Authorization': `Bearer ${jwt}`
@@ -167,7 +220,7 @@ const WRITE_TOOLS = {
         type: 'object',
         properties: {
           task_id:     { type: 'string', description: 'מזהה המשימה (id) מהרשימה' },
-          status:      { type: 'string', enum: ['פתוח', 'בביצוע', 'בוצע'], description: 'הסטטוס החדש' },
+          status:      { type: 'string', enum: ['פתוח', 'בביצוע', 'הושלם'], description: 'הסטטוס החדש' },
           description: { type: 'string', description: 'תיאור קריא לאדם של הפעולה' }
         },
         required: ['task_id', 'status', 'description']
@@ -204,6 +257,26 @@ async function handleRoleChat(request, env, cors) {
 
   if (!new_message) return jsonRes({ error: 'new_message is required' }, cors, 400);
 
+  // RAG — vector search for relevant knowledge chunks
+  let knowledgeBlock = '';
+  if (role_profile.id && manager_id && env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
+    try {
+      const embedRes = await env.AI.run('@cf/baai/bge-m3', { text: [new_message] });
+      const queryEmbedding = embedRes.data?.[0];
+      if (queryEmbedding) {
+        const chunks = await sbRpc(env, 'match_knowledge_chunks', {
+          query_embedding: queryEmbedding,
+          match_role_id: role_profile.id,
+          match_manager_id: manager_id,
+          match_count: 5
+        });
+        if (chunks && chunks.length) {
+          knowledgeBlock = '\n\nבסיס ידע רלוונטי:\n' + chunks.map(c => c.content).join('\n\n---\n\n');
+        }
+      }
+    } catch (e) { /* אם RAG נכשל — ממשיכים בלי ידע */ }
+  }
+
   // Fetch live data for read-permitted entities
   let liveDataBlock = '';
   if (manager_id && permissions && env.SUPABASE_URL && env.SUPABASE_SERVICE_KEY) {
@@ -213,23 +286,24 @@ async function handleRoleChat(request, env, cors) {
       try {
         const ships = await sbGet(env, 'shipments', {
           select: 'id,supplier,carrier,status,tracking_number,origin_country,destination,departure_date,arrival_date',
-          user_id: `eq.${manager_id}`,
+          manager_id: manager_id,
           order: 'created_at.desc',
           limit: '40'
         });
+        console.log('ships result:', JSON.stringify(ships));
         if (ships.length) {
           parts.push('משלוחים:\n' + ships.map(s =>
             `[id:${s.id}] ${s.supplier||'-'} | ${s.carrier||'-'} | סטטוס:${s.status} | מעקב:${s.tracking_number||'-'} | מ:${s.origin_country||'-'} ל:${s.destination||'-'} | יציאה:${s.departure_date||'-'} הגעה:${s.arrival_date||'-'}`
           ).join('\n'));
         }
-      } catch(e) {}
+      } catch(e) { console.log('ships error:', e.message); }
     }
 
     if (permissions.tasks?.read) {
       try {
         const tasks = await sbGet(env, 'tasks', {
           select: 'id,title,status,priority',
-          user_id: `eq.${manager_id}`,
+          user_id: manager_id,
           order: 'created_at.desc',
           limit: '40'
         });
@@ -245,7 +319,7 @@ async function handleRoleChat(request, env, cors) {
       try {
         const quotes = await sbGet(env, 'quotes', {
           select: 'id,client_name,status,total',
-          user_id: `eq.${manager_id}`,
+          user_id: manager_id,
           order: 'created_at.desc',
           limit: '20'
         });
@@ -261,7 +335,7 @@ async function handleRoleChat(request, env, cors) {
       try {
         const orders = await sbGet(env, 'orders', {
           select: 'id,client_name,type,status,total',
-          user_id: `eq.${manager_id}`,
+          user_id: manager_id,
           order: 'created_at.desc',
           limit: '20'
         });
@@ -292,7 +366,6 @@ async function handleRoleChat(request, env, cors) {
     memoryBlock = '\n\nידע שנצבר מניסיון קודם:\n' + top.map(m => `• [${m.category}] ${m.content}`).join('\n');
   }
 
-  const knowledgeBlock  = role_profile.knowledge     ? `\n\nבסיס ידע:\n${role_profile.knowledge}` : '';
   const customBlock     = role_profile.system_prompt ? `\n\nהוראות מיוחדות:\n${role_profile.system_prompt}` : '';
   const writeInstruction = hasWritePerms
     ? '\n- כשהמשתמש מבקש לעדכן נתונים (סטטוס משלוח, משימה וכו\') — השתמש בכלי המתאים. אל תאמר שאתה מבצע פעולה בטקסט בלבד.'
@@ -372,11 +445,15 @@ async function handleRoleAction(request, env, cors) {
   const user = await verifyJwt(env, employee_jwt);
   if (!user) return jsonRes({ error: 'הפגישה פגה — אנא התחבר מחדש' }, cors, 401);
 
+  // Resolve employee_id for this auth user
+  const empUsers = await sbGet(env, 'employee_users', { select: 'employee_id', auth_user_id: user.id });
+  const employee_id = empUsers[0]?.employee_id || null;
+
   // 2. Fetch permissions from DB (server-side — never trust client)
   const roles = await sbGet(env, 'job_roles', {
     select: 'permissions',
-    id: `eq.${role_id}`,
-    user_id: `eq.${manager_id}`
+    id: role_id,
+    user_id: manager_id
   });
   if (!roles.length) return jsonRes({ error: 'תפקיד לא נמצא' }, cors, 403);
   const permissions = roles[0].permissions || {};
@@ -392,7 +469,7 @@ async function handleRoleAction(request, env, cors) {
   switch (action_type) {
     case 'update_shipment_status': {
       await sbPatch(env, 'shipments',
-        { id: params.shipment_id, user_id: manager_id },
+        { id: params.shipment_id, manager_id: manager_id },
         { status: params.status, updated_at: new Date().toISOString() }
       );
       return jsonRes({ success: true, message: `סטטוס המשלוח עודכן ל-${params.status}` }, cors);
@@ -407,6 +484,7 @@ async function handleRoleAction(request, env, cors) {
     case 'create_task': {
       await sbInsert(env, 'tasks', {
         user_id: manager_id,
+        employee_id: employee_id,
         title: params.title,
         description: params.description || '',
         priority: params.priority || 'רגיל',
@@ -426,8 +504,94 @@ async function handleRoleAction(request, env, cors) {
 async function handleEmbed(request, env, cors) {
   const { texts } = await request.json();
   if (!texts || !texts.length) return jsonRes({ error: 'texts required' }, cors, 400);
-  const result = await env.AI.run('@cf/baai/bge-small-en-v1.5', { text: texts });
+  const result = await env.AI.run('@cf/baai/bge-m3', { text: texts });
   return jsonRes({ embeddings: result.data }, cors);
+}
+
+// ─── POST /role-index — chunk + embed knowledge base ─────────
+
+async function handleRoleIndex(request, env, cors) {
+  const { role_id, manager_id, content } = await request.json();
+  if (!role_id || !manager_id || !content) {
+    return jsonRes({ error: 'role_id, manager_id, content required' }, cors, 400);
+  }
+
+  // 1. Delete existing chunks for this role
+  await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+
+  // 2. Split into chunks
+  const chunks = chunkText(content);
+  if (!chunks.length) return jsonRes({ indexed: 0 }, cors);
+
+  // 3. Embed all chunks
+  const embedResult = await env.AI.run('@cf/baai/bge-m3', { text: chunks });
+  const embeddings = embedResult.data || [];
+
+  // 4. Insert chunks with embeddings
+  const rows = chunks.map((chunk, i) => ({
+    role_id,
+    manager_id,
+    chunk_index: i,
+    content: chunk,
+    embedding: embeddings[i] ? JSON.stringify(embeddings[i]) : null
+  }));
+  await sbInsert(env, 'role_knowledge_chunks', rows);
+
+  return jsonRes({ indexed: rows.length }, cors);
+}
+
+// ─── POST /role-save — learn + save insights server-side ─────
+
+async function handleRoleSave(request, env, cors) {
+  const { conversation_history, role_profile, agent_id, conv_id } = await request.json();
+
+  if (!conversation_history || conversation_history.length < 2 || !agent_id) {
+    return jsonRes({ saved: 0 }, cors);
+  }
+
+  // 1. Extract insights via Claude
+  const convText = conversation_history
+    .map(m => `${m.role === 'user' ? 'עובד' : 'סוכן'}: ${m.content}`)
+    .join('\n');
+
+  const system = `אתה מנתח שיחות עבודה. תפקידך לחלץ תובנות שיעזרו לעובד הבא בתפקיד "${role_profile?.title || ''}". החזר JSON בלבד.`;
+  const prompt = `נתח שיחה זו וחלץ עד 5 תובנות שימושיות:\n\n${convText}\n\nפורמט JSON:\n{"insights":[{"category":"workflow|faq|process|contact|insight","content":"תיאור בעברית","importance":3}]}\n\nimportance: 1=נמוך, 5=גבוה מאוד. כלול רק מידע שיועיל לעובד הבא.`;
+
+  let insights = [];
+  try {
+    const text = await claude(env, system, [{ role: 'user', content: prompt }], 512);
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) insights = JSON.parse(match[0]).insights || [];
+  } catch (e) {}
+
+  // 2. Close the conversation record
+  if (conv_id) {
+    await sbPatch(env, 'role_conversations', { id: conv_id }, { ended_at: new Date().toISOString() }).catch(() => {});
+  }
+
+  if (!insights.length) return jsonRes({ saved: 0 }, cors);
+
+  // 3. Insert insights into role_agent_memory
+  const inserts = insights.map(ins => ({
+    agent_id,
+    category: ins.category || 'insight',
+    content: ins.content,
+    importance: Math.min(5, Math.max(1, ins.importance || 1))
+  }));
+  await sbInsert(env, 'role_agent_memory', inserts).catch(() => {});
+
+  // 4. Bump total_conversations counter
+  try {
+    const agents = await sbGet(env, 'role_agents', { select: 'total_conversations', id: agent_id });
+    if (agents.length) {
+      await sbPatch(env, 'role_agents', { id: agent_id }, {
+        total_conversations: (agents[0].total_conversations || 0) + 1,
+        last_updated: new Date().toISOString()
+      });
+    }
+  } catch (e) {}
+
+  return jsonRes({ saved: inserts.length }, cors);
 }
 
 // ─── POST /role-learn ─────────────────────────────────────────

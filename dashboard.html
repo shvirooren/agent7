@@ -452,29 +452,9 @@ body{overflow-x:hidden}
       <div class="card" style="margin-bottom:16px">
         <div class="ch">
           <div class="ct">סוכני AI לפי תפקיד</div>
-          <div style="display:flex;gap:8px">
-            <button class="bsv" onclick="window.location.href='agent-setup.html'" style="font-size:13px;padding:7px 14px">🚀 הגדר סוכן חדש</button>
-            <button class="bot" onclick="toggleRoleForm()">+ תפקיד ידני</button>
-          </div>
+          <button class="bsv" onclick="window.location.href='agent-setup.html'" style="font-size:13px;padding:7px 14px">🚀 הגדר סוכן חדש</button>
         </div>
         <div class="cb">
-          <!-- טופס תפקיד חדש -->
-          <div id="role-form" style="display:none;background:var(--gl);border:1px solid var(--gm);border-radius:6px;padding:16px;margin-bottom:16px">
-            <div class="fr" style="margin-bottom:10px">
-              <div class="fg" style="margin:0"><label class="fl">שם התפקיד *</label><input class="fi" id="rf-title" placeholder="מנהל מכירות"></div>
-            </div>
-            <div class="fg" style="margin-bottom:10px"><label class="fl">תיאור התפקיד</label><textarea class="fi" id="rf-desc" rows="2" placeholder="תאר את מטרת התפקיד..."></textarea></div>
-            <div class="fg" style="margin-bottom:10px"><label class="fl">אחריות ומשימות</label><textarea class="fi" id="rf-resp" rows="2" placeholder="פרט את המשימות העיקריות..."></textarea></div>
-            <div class="fg" style="margin-bottom:12px">
-              <label class="fl">הוראות לסוכן (System Prompt)</label>
-              <textarea class="fi" id="rf-systemprompt" rows="3" placeholder="אתה סוכן AI מקצועי בתחום [תחום]. הטון שלך הוא ידידותי ומקצועי. תמיד ענה בעברית..."></textarea>
-              <div class="fh">הוראות אלו יעצבו את אופי הסוכן והתנהגותו בשיחות</div>
-            </div>
-            <div style="display:flex;gap:8px">
-              <button class="bsv" onclick="saveRole()">צור תפקיד וסוכן</button>
-              <button class="bot" onclick="toggleRoleForm()">ביטול</button>
-            </div>
-          </div>
           <!-- רשימת סוכנים -->
           <div id="agents-grid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px">
             <div style="text-align:center;color:var(--gt);padding:40px;grid-column:1/-1">טוען...</div>

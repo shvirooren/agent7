@@ -140,9 +140,6 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
 .agent-chat-header{background:var(--bd);color:#fff;padding:14px 18px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
 .agent-chat-title{font-size:14px;font-weight:700}
 .agent-chat-sub{font-size:12px;color:#93c5fd;margin-top:2px}
-.end-conv-btn{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.2);padding:6px 13px;border-radius:7px;font-family:'Heebo',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:.15s}
-.end-conv-btn:hover{background:rgba(255,255,255,.22)}
-.end-conv-btn:disabled{opacity:.5;cursor:not-allowed}
 .chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;background:var(--gl)}
 .cmsg{display:flex;gap:8px;max-width:80%}
 .cmsg.user{align-self:flex-start;flex-direction:row-reverse}
@@ -297,7 +294,6 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
         <div class="agent-chat-title" id="agent-panel-title">🤖 הסוכן שלי</div>
         <div class="agent-chat-sub" id="agent-panel-sub">טוען...</div>
       </div>
-      <button class="end-conv-btn" id="end-conv-btn" onclick="endRoleConversation()">סיים שיחה ✓</button>
     </div>
     <div class="chat-messages" id="chat-messages">
       <div class="chat-welcome" id="chat-welcome">
@@ -423,8 +419,14 @@ function getEmployeeId(){
     loadTasks();
 
     // Realtime subscription
+    // INSERT/UPDATE מגיעים עם הנתונים — הפילטר עובד
+    // DELETE לא מכיל נתונים אחרי המחיקה, הפילטר לא יפעל — מאזינים בנפרד
     sb.channel('emp-tasks-'+EMP_ID)
-      .on('postgres_changes',{event:'*',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+      .on('postgres_changes',{event:'INSERT',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+        function(){loadTasks();})
+      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+        function(){loadTasks();})
+      .on('postgres_changes',{event:'DELETE',schema:'public',table:'tasks'},
         function(){loadTasks();})
       .subscribe();
   });
@@ -654,7 +656,7 @@ function switchTab(tab){
 //  ROLE AGENT — הסוכן שלי
 // ══════════════════════════════════════════
 var WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
-var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false, roleKnowledge='';
+var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false;
 
 function loadRoleAgent(){
   if(!EMP_ID)return;
@@ -682,13 +684,7 @@ function loadRoleAgent(){
           if(cr.data)roleConvId=cr.data.id;
         });
       }
-      // טוען knowledge base ייעודי לתפקיד זה
-      if(roleProfile&&emp.role_id){
-        sb.from('role_knowledge').select('content').eq('role_id',emp.role_id).maybeSingle().then(function(kr){
-          if(kr.error)return;
-          if(kr.data&&kr.data.content)roleKnowledge=kr.data.content;
-        });
-      }
+      // knowledge נטען ב-RAG בצד השרת — אין צורך לטעון כאן
     });
   });
 }
@@ -718,12 +714,12 @@ function sendRoleMessage(){
   if(cnEl)companyName=cnEl.textContent||'';
 
   var roleProfilePayload={
+    id:roleProfile.id,
     title:roleProfile.title,
     description:roleProfile.description||'',
     responsibilities:roleProfile.responsibilities||'',
     system_prompt:roleProfile.system_prompt||'',
-    company_name:companyName,
-    knowledge:roleKnowledge?roleKnowledge.substring(0,50000):''
+    company_name:companyName
   };
 
   // חיפוש סמנטי — מצא זיכרונות רלוונטיים להודעה הנוכחית
@@ -856,61 +852,22 @@ function showTyping(show){
   area.scrollTop=area.scrollHeight;
 }
 
-function endRoleConversation(){
-  if(roleConvHistory.length<2){toast('אין מספיק שיחה לסיכום','warning');return;}
-  var btn=document.getElementById('end-conv-btn');
-  btn.disabled=true;btn.textContent='שומר...';
-
-  // סגור שיחה ב-DB
-  if(roleConvId)sb.from('role_conversations').update({ended_at:new Date().toISOString()}).eq('id',roleConvId).then(function(r){if(r.error)toast('שגיאה בסגירת שיחה','error');});
-
-  fetch(WORKER_URL+'/role-learn',{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({conversation_history:roleConvHistory,role_profile:roleProfile})
-  }).then(function(r){return r.json();}).then(function(data){
-    var insights=data.insights||[];
-    function finishConv(savedCount){
-      toast('השיחה נשמרה! '+(savedCount?savedCount+' תובנות נוספו לסוכן.':''),'success');
-      roleConvHistory=[];roleConvId=null;
-      document.querySelectorAll('.cmsg').forEach(function(m){m.remove();});
-      document.getElementById('chat-welcome').style.display='block';
-      if(roleAgent)sb.from('role_conversations').insert({employee_id:EMP_ID,agent_id:roleAgent.id}).select().maybeSingle().then(function(cr){if(!cr.error&&cr.data)roleConvId=cr.data.id;});
-    }
-    if(roleAgent&&insights.length){
-      var contents=insights.map(function(ins){return ins.content||'';});
-      fetch(WORKER_URL+'/embed',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({texts:contents})})
-        .then(function(r){return r.json();}).catch(function(){return{};})
-        .then(function(ed){
-          var embeddings=ed.embeddings||[];
-          var personalCategories=['זהות','העדפה'];
-          var inserts=insights.map(function(ins,i){
-            var row={agent_id:roleAgent.id,category:ins.category||'insight',content:ins.content,importance:Math.min(5,Math.max(1,ins.importance||1))};
-            if(embeddings[i])row.embedding=JSON.stringify(embeddings[i]);
-            if(personalCategories.indexOf(ins.category)!==-1)row.employee_id=EMP_ID;
-            return row;
-          });
-          sb.from('role_agent_memory').insert(inserts).then(function(ir){
-            if(ir.error){console.error('role_agent_memory insert error:',ir.error);toast('שגיאה בשמירת תובנות: '+ir.error.message,'error');finishConv(0);return;}
-            sb.from('role_agents').update({total_conversations:(roleAgent.total_conversations||0)+1,last_updated:new Date().toISOString()}).eq('id',roleAgent.id);
-            sb.from('role_agent_memory').select('id,importance,created_at').eq('agent_id',roleAgent.id).order('importance',{ascending:false}).order('created_at',{ascending:false}).then(function(allMem){
-              if(allMem.data&&allMem.data.length>60){
-                var toDelete=allMem.data.slice(60).map(function(m){return m.id;});
-                sb.from('role_agent_memory').delete().in('id',toDelete);
-              }
-            });
-            finishConv(inserts.length);
-          });
-        });
-    } else {
-      finishConv(0);
-    }
-  }).catch(function(){
-    toast('שגיאה בשמירת השיחה','error');
-  }).finally(function(){
-    btn.disabled=false;btn.textContent='סיים שיחה ✓';
-  });
+// שליחה לשרת: learn + שמירת תובנות + סגירת שיחה — הכל בצד שרת
+function saveConversationToServer(agentId, convId, history, profile, keepalive){
+  if(!history||history.length<2||!agentId)return;
+  var body=JSON.stringify({conversation_history:history,role_profile:profile,agent_id:agentId,conv_id:convId,employee_id:EMP_ID});
+  if(keepalive){
+    navigator.sendBeacon(WORKER_URL+'/role-save',new Blob([body],{type:'application/json'}));
+  } else {
+    return fetch(WORKER_URL+'/role-save',{method:'POST',headers:{'Content-Type':'application/json'},body:body});
+  }
 }
+
+// שמירה רק בסגירת דף — שיחה שלמה, לא חצויה
+window.addEventListener('pagehide',function(){
+  if(!roleAgent||roleConvHistory.length<2)return;
+  saveConversationToServer(roleAgent.id,roleConvId,roleConvHistory.slice(),roleProfile,true);
+});
 
 // Auto-resize textarea
 var agentInput=document.getElementById('agent-input');
@@ -953,11 +910,13 @@ function confirmDbAction(){
       })
     }).then(function(r){return r.json();}).then(function(data){
       document.getElementById('db-action-modal').style.display='none';
+      var completedAction=_pendingDbAction;
       _pendingDbAction=null;
       if(data.success){
         toast(data.message||'הפעולה בוצעה ✓','success');
         addChatMsg('assistant','✅ '+( data.message||'הפעולה בוצעה בהצלחה'));
         roleConvHistory.push({role:'assistant',content:'✅ '+(data.message||'הפעולה בוצעה בהצלחה')});
+        if(completedAction&&(completedAction.type==='create_task'||completedAction.type==='update_task_status'))loadTasks();
       } else {
         toast(data.error||'שגיאה בביצוע הפעולה','error');
       }

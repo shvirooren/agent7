@@ -18,7 +18,6 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/role-chat')   return await handleRoleChat(request, env, cors);
-      if (url.pathname === '/role-learn')  return await handleRoleLearn(request, env, cors);
       if (url.pathname === '/role-save')   return await handleRoleSave(request, env, cors);
       if (url.pathname === '/role-index')  return await handleRoleIndex(request, env, cors);
       if (url.pathname === '/role-action') return await handleRoleAction(request, env, cors);
@@ -543,19 +542,49 @@ async function handleRoleIndex(request, env, cors) {
 // ─── POST /role-save — learn + save insights server-side ─────
 
 async function handleRoleSave(request, env, cors) {
-  const { conversation_history, role_profile, agent_id, conv_id } = await request.json();
+  const { conversation_history, role_profile, agent_id, conv_id, employee_id } = await request.json();
 
   if (!conversation_history || conversation_history.length < 2 || !agent_id) {
     return jsonRes({ saved: 0 }, cors);
   }
 
-  // 1. Extract insights via Claude
+  // 1. Close the conversation record immediately
+  if (conv_id) {
+    await sbPatch(env, 'role_conversations', { id: conv_id }, { ended_at: new Date().toISOString() }).catch(() => {});
+  }
+
+  // 2. Fetch existing memories to avoid duplicates
+  let existingMemories = [];
+  try {
+    existingMemories = await sbGet(env, 'role_agent_memory', {
+      select: 'content',
+      agent_id,
+      order: 'importance.desc',
+      limit: '40'
+    });
+  } catch(e) {}
+
+  const existingBlock = existingMemories.length
+    ? '\n\nזיכרונות קיימים — אל תשכפל:\n' + existingMemories.map(m => `• ${m.content}`).join('\n')
+    : '';
+
+  // 3. Extract insights via Claude
   const convText = conversation_history
     .map(m => `${m.role === 'user' ? 'עובד' : 'סוכן'}: ${m.content}`)
     .join('\n');
 
   const system = `אתה מנתח שיחות עבודה. תפקידך לחלץ תובנות שיעזרו לעובד הבא בתפקיד "${role_profile?.title || ''}". החזר JSON בלבד.`;
-  const prompt = `נתח שיחה זו וחלץ עד 5 תובנות שימושיות:\n\n${convText}\n\nפורמט JSON:\n{"insights":[{"category":"workflow|faq|process|contact|insight","content":"תיאור בעברית","importance":3}]}\n\nimportance: 1=נמוך, 5=גבוה מאוד. כלול רק מידע שיועיל לעובד הבא.`;
+  const prompt = `נתח שיחה זו וחלץ עד 5 תובנות שימושיות:
+
+${convText}${existingBlock}
+
+פורמט JSON:
+{"insights":[{"category":"workflow|faq|process|contact|insight|זהות|העדפה","content":"תיאור בעברית","importance":3,"personal":false}]}
+
+חוקים:
+- importance: 1=נמוך, 5=גבוה מאוד — שמור רק importance >= 2
+- אל תכלול תובנות הדומות לזיכרונות הקיימים
+- personal: true רק אם התובנה אישית לעובד הזה ולא לתפקיד בכלל`;
 
   let insights = [];
   try {
@@ -564,23 +593,28 @@ async function handleRoleSave(request, env, cors) {
     if (match) insights = JSON.parse(match[0]).insights || [];
   } catch (e) {}
 
-  // 2. Close the conversation record
-  if (conv_id) {
-    await sbPatch(env, 'role_conversations', { id: conv_id }, { ended_at: new Date().toISOString() }).catch(() => {});
-  }
+  // 4. Filter low-importance + build insert rows
+  const PERSONAL_CATEGORIES = new Set(['זהות', 'העדפה']);
+  const inserts = insights
+    .filter(ins => (ins.importance || 1) >= 2)
+    .map(ins => {
+      const row = {
+        agent_id,
+        category: ins.category || 'insight',
+        content: ins.content,
+        importance: Math.min(5, Math.max(2, ins.importance || 2))
+      };
+      if (ins.personal || PERSONAL_CATEGORIES.has(ins.category)) {
+        row.employee_id = employee_id || null;
+      }
+      return row;
+    });
 
-  if (!insights.length) return jsonRes({ saved: 0 }, cors);
+  if (!inserts.length) return jsonRes({ saved: 0 }, cors);
 
-  // 3. Insert insights into role_agent_memory
-  const inserts = insights.map(ins => ({
-    agent_id,
-    category: ins.category || 'insight',
-    content: ins.content,
-    importance: Math.min(5, Math.max(1, ins.importance || 1))
-  }));
   await sbInsert(env, 'role_agent_memory', inserts).catch(() => {});
 
-  // 4. Bump total_conversations counter
+  // 5. Bump total_conversations counter
   try {
     const agents = await sbGet(env, 'role_agents', { select: 'total_conversations', id: agent_id });
     if (agents.length) {
@@ -594,37 +628,3 @@ async function handleRoleSave(request, env, cors) {
   return jsonRes({ saved: inserts.length }, cors);
 }
 
-// ─── POST /role-learn ─────────────────────────────────────────
-
-async function handleRoleLearn(request, env, cors) {
-  const { conversation_history, role_profile } = await request.json();
-
-  if (!conversation_history || conversation_history.length < 2) {
-    return jsonRes({ insights: [] }, cors);
-  }
-
-  const convText = conversation_history
-    .map(m => `${m.role === 'user' ? 'עובד' : 'סוכן'}: ${m.content}`)
-    .join('\n');
-
-  const system = `אתה מנתח שיחות עבודה. תפקידך לחלץ תובנות שיעזרו לעובד הבא בתפקיד "${role_profile.title}". החזר JSON בלבד.`;
-
-  const prompt = `נתח שיחה זו וחלץ עד 5 תובנות שימושיות:
-
-${convText}
-
-פורמט JSON:
-{"insights":[{"category":"workflow|faq|process|contact|insight","content":"תיאור בעברית","importance":3}]}
-
-importance: 1=נמוך, 5=גבוה מאוד. כלול רק מידע שיועיל לעובד הבא.`;
-
-  const text = await claude(env, system, [{ role: 'user', content: prompt }], 512);
-
-  let insights = [];
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    if (match) insights = JSON.parse(match[0]).insights || [];
-  } catch (e) { insights = []; }
-
-  return jsonRes({ insights }, cors);
-}

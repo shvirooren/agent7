@@ -443,8 +443,13 @@ function addFiles(fileObjs) {
   fileObjs.forEach(function(f) {
     if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) { toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return; }
     if (files.find(function(x) { return x.name === f.name; })) return;
-    files.push({ name: f.name, size: f.size, fileObj: f, status: 'pending' });
+    var entry = { name: f.name, size: f.size, fileObj: f, content: null, status: 'pending' };
+    files.push(entry);
     renderFileList(); updateCounter();
+    // קרא תוכן במקביל להצגה
+    var reader = new FileReader();
+    reader.onload = function(e) { entry.content = e.target.result; };
+    reader.readAsText(f);
   });
 }
 
@@ -490,52 +495,51 @@ async function startProcessing() {
   var indexed = 0;
   var firstIndex = true;
 
-  // ── העלאת קבצים ל-Storage ואינדוקס ──
+  // ── קבצים: העלאה ל-Storage (שמירה) + אינדוקס ישיר מ-content (בגושים) ──
+  var BATCH = 300000;
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
+    var content = f.content;
+    if (!content) { files[i].status = 'error'; renderFileList(); continue; }
+
     var safeFilename = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     var storagePath = CU.id + '/' + selectedRoleId + '/' + safeFilename;
 
-    // 1. העלה ל-Supabase Storage
+    // 1. העלה ל-Storage לשמירה (non-fatal)
+    var fileId = null;
     var upRes = await sb.storage.from('role-knowledge').upload(storagePath, f.fileObj, { upsert: true });
-    if (upRes.error) {
-      toast('שגיאה בהעלאת ' + f.name + ': ' + upRes.error.message, 'error');
-      files[i].status = 'error'; renderFileList(); continue;
+    if (!upRes.error) {
+      var regRes = await sb.from('role_knowledge_files').upsert({
+        role_id:      selectedRoleId,
+        manager_id:   CU.id,
+        filename:     f.name,
+        file_size:    f.size,
+        storage_path: storagePath
+      }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
+      if (regRes.data) fileId = regRes.data.id;
     }
 
-    // 2. רשום בטבלת הקבצים
-    var regRes = await sb.from('role_knowledge_files').upsert({
-      role_id:      selectedRoleId,
-      manager_id:   CU.id,
-      filename:     f.name,
-      file_size:    f.size,
-      storage_path: storagePath
-    }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
-
-    if (regRes.error || !regRes.data) {
-      toast('שגיאה ברישום ' + f.name, 'error');
-      files[i].status = 'error'; renderFileList(); continue;
-    }
-
-    // 3. שלח ל-Worker לאינדוקס מ-Storage
+    // 2. אינדוקס מ-content בגושים של 300k
     try {
-      var idxRes = await fetch(ROLE_WORKER_URL + '/role-index', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          role_id:      selectedRoleId,
-          manager_id:   CU.id,
-          storage_path: 'role-knowledge/' + storagePath,
-          filename:     f.name,
-          file_id:      regRes.data.id,
-          append:       !firstIndex
-        })
-      });
-      var idxData = await idxRes.json();
-      if (!idxRes.ok) throw new Error(idxData.error || 'שגיאת שרת');
-      indexed += idxData.indexed || 0;
+      for (var bi = 0; bi < content.length; bi += BATCH) {
+        var idxRes = await fetch(ROLE_WORKER_URL + '/role-index', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role_id:    selectedRoleId,
+            manager_id: CU.id,
+            content:    content.slice(bi, bi + BATCH),
+            filename:   f.name,
+            file_id:    bi === 0 ? fileId : null,
+            append:     !(firstIndex && bi === 0)
+          })
+        });
+        var idxData = await idxRes.json();
+        if (!idxRes.ok) throw new Error(idxData.error || 'שגיאת שרת');
+        indexed += idxData.indexed || 0;
+        firstIndex = false;
+      }
       files[i].status = 'indexed';
-      firstIndex = false;
     } catch(e) {
       files[i].status = 'error';
       toast('שגיאה באינדוקס ' + f.name + ': ' + e.message, 'error');

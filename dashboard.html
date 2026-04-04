@@ -2557,7 +2557,7 @@ function loadRoleAgents(){
         h+='</div>';
         h+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
         h+='<button class="bsm bsb" data-role-id="'+esc(role.id)+'" onclick="openRoleChat(this)" style="flex:1;min-width:70px">💬 שיחה</button>';
-        h+='<button class="bsm" style="background:var(--op);color:var(--or);flex:1;min-width:70px" data-role-id="'+esc(role.id)+'" onclick="openAgentSettings(this)">⚙️ הגדרות</button>';
+        h+='<button class="bsm" style="background:var(--op);color:var(--or);flex:1;min-width:70px" data-role-id="'+esc(role.id)+'" onclick="editAgentSetup(this)">✏️ ערוך</button>';
         if(agent){h+='<button class="bsm bsb" data-agent-id="'+esc(agent.id)+'" data-title="'+esc(role.title)+'" onclick="openAgentMemoryModal(this)" title="זיכרון">📚</button>';}
         h+='<button class="bsm bsr" data-id="'+esc(role.id)+'" onclick="deleteRole(this)" title="מחק">🗑️</button>';
         h+='</div>';
@@ -2913,6 +2913,12 @@ function collectPermissions(){
     perms[e.key]={read:!!(r&&r.checked),write:!!(w&&w.checked)};
   });
   return perms;
+}
+
+function editAgentSetup(btn){
+  var roleId=btn.dataset.roleId;
+  sessionStorage.setItem('editRole', roleId);
+  window.location.href='agent-setup.html';
 }
 
 function openAgentSettings(btn){

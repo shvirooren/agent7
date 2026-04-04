@@ -316,7 +316,14 @@ var PERM_ENTITIES = [
   if (!session) { window.location.href = 'login.html'; return; }
   CU = session.user;
   renderPermTable({});
-  loadExistingRoles();
+  await loadExistingRoles();
+  var editRoleId = sessionStorage.getItem('editRole');
+  if (editRoleId) {
+    sessionStorage.removeItem('editRole');
+    setMode('existing');
+    document.getElementById('existing-role').value = editRoleId;
+    loadExistingRoleData();
+  }
 })();
 
 // ── Permissions ───────────────────────────────────────────────

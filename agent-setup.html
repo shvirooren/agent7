@@ -17,16 +17,12 @@
       background: var(--gl); color: var(--td);
       direction: rtl; min-height: 100vh; display: flex; flex-direction: column;
     }
-
-    /* Header */
     .hdr {
       background: var(--bd); color: #fff;
       padding: 14px 24px; display: flex; align-items: center; gap: 12px;
     }
     .logo { font-size: 20px; font-weight: 800; color: var(--ba); }
     .hdr-sub { font-size: 14px; opacity: .7; }
-
-    /* Main */
     .main {
       flex: 1; display: flex; align-items: flex-start;
       justify-content: center; padding: 40px 16px;
@@ -34,10 +30,8 @@
     .card {
       background: #fff; border-radius: 16px;
       box-shadow: 0 4px 24px rgba(0,0,0,.08);
-      width: 100%; max-width: 620px; overflow: hidden;
+      width: 100%; max-width: 640px; overflow: hidden;
     }
-
-    /* Steps indicator */
     .steps {
       display: flex; background: var(--gl);
       border-bottom: 1px solid var(--gm); padding: 14px 24px;
@@ -53,13 +47,9 @@
     }
     .si.active .si-num { background: var(--bm); color: #fff; }
     .si.done  .si-num  { background: var(--gr); color: #fff; }
-
-    /* Step content */
-    .sc { padding: 32px 24px; }
+    .sc { padding: 28px 24px; }
     .sc-title { font-size: 20px; font-weight: 800; color: var(--bd); margin-bottom: 6px; }
-    .sc-sub   { font-size: 14px; color: var(--gt); margin-bottom: 24px; line-height: 1.6; }
-
-    /* Toggle */
+    .sc-sub   { font-size: 14px; color: var(--gt); margin-bottom: 22px; line-height: 1.6; }
     .toggle { display: flex; gap: 8px; margin-bottom: 20px; }
     .tb {
       flex: 1; padding: 10px; border: 1.5px solid var(--gm); border-radius: 8px;
@@ -67,10 +57,9 @@
       color: var(--gt); text-align: center; transition: all .2s; font-family: inherit;
     }
     .tb.active { border-color: var(--bm); background: #EBF5FF; color: var(--bm); }
-
-    /* Form */
     .field { margin-bottom: 16px; }
     .lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .hint { font-size: 11px; color: var(--gt); margin-top: 4px; }
     .inp, .ta, .sel {
       width: 100%; padding: 10px 12px; border: 1.5px solid var(--gm);
       border-radius: 8px; font-size: 14px; font-family: inherit;
@@ -78,20 +67,28 @@
     }
     .inp:focus, .ta:focus, .sel:focus { outline: none; border-color: var(--ba); }
     .ta { resize: vertical; min-height: 80px; }
-
+    .section-title {
+      font-size: 13px; font-weight: 700; color: var(--bd);
+      margin: 20px 0 12px; padding-bottom: 8px;
+      border-bottom: 1px solid var(--gm);
+    }
+    /* Permissions */
+    .perm-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
+    .perm-table th { text-align: right; padding: 8px 10px; background: var(--gl); font-weight: 700; }
+    .perm-table th:not(:first-child) { text-align: center; }
+    .perm-table td { padding: 8px 10px; border-bottom: 1px solid var(--gm); }
+    .perm-table td:not(:first-child) { text-align: center; }
     /* Drop zone */
     .dz {
       border: 2px dashed var(--gm); border-radius: 12px;
-      padding: 36px 24px; text-align: center;
-      cursor: pointer; transition: all .2s; margin-bottom: 16px;
+      padding: 28px 24px; text-align: center;
+      cursor: pointer; transition: all .2s; margin-bottom: 12px;
     }
     .dz:hover, .dz.over { border-color: var(--ba); background: #F0F9FF; }
-    .dz-icon  { font-size: 40px; margin-bottom: 10px; }
-    .dz-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .dz-icon  { font-size: 36px; margin-bottom: 8px; }
+    .dz-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
     .dz-sub   { font-size: 12px; color: var(--gt); }
-
-    /* File list */
-    .fl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .fl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .fi {
       display: flex; align-items: center; gap: 8px;
       padding: 8px 12px; background: var(--gl); border-radius: 8px; font-size: 13px;
@@ -99,19 +96,13 @@
     .fn { flex: 1; font-weight: 500; }
     .fs { color: var(--gt); font-size: 12px; }
     .frm { cursor: pointer; color: var(--rd); font-size: 18px; background: none; border: none; line-height: 1; }
-
-    /* Char counter */
     .cc { font-size: 12px; color: var(--gt); text-align: left; margin-top: 4px; }
     .cc.warn { color: var(--or); }
-
-    /* OR separator */
     .or {
       display: flex; align-items: center; gap: 12px;
-      margin: 14px 0; color: var(--gt); font-size: 12px;
+      margin: 12px 0; color: var(--gt); font-size: 12px;
     }
     .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--gm); }
-
-    /* Buttons */
     .btn {
       padding: 12px 24px; border-radius: 8px; font-size: 14px;
       font-weight: 700; cursor: pointer; border: none;
@@ -125,11 +116,8 @@
       border: 1.5px solid var(--gm); margin-top: 8px;
     }
     .btn-s:hover { background: var(--gm); }
-
-    /* Processing */
     .prog-bar { height: 6px; background: var(--gm); border-radius: 3px; overflow: hidden; margin: 20px 0; }
     .prog-fill { height: 100%; background: var(--ba); border-radius: 3px; transition: width .5s ease; }
-
     .ps-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
     .ps {
       display: flex; align-items: center; gap: 12px;
@@ -139,8 +127,6 @@
     .ps.active { background: #EBF5FF; color: var(--bm); font-weight: 600; }
     .ps.done   { background: #F0FFF4; color: var(--gr); }
     .ps-icon   { font-size: 22px; width: 30px; text-align: center; flex-shrink: 0; }
-
-    /* Done */
     .done-icon  { font-size: 64px; text-align: center; margin-bottom: 16px; }
     .done-title { font-size: 22px; font-weight: 800; color: var(--bd); text-align: center; margin-bottom: 6px; }
     .done-sub   { font-size: 14px; color: var(--gt); text-align: center; margin-bottom: 24px; }
@@ -148,8 +134,6 @@
     .stat { flex: 1; background: var(--gl); border-radius: 10px; padding: 16px; text-align: center; }
     .stat-n { font-size: 30px; font-weight: 800; color: var(--bm); }
     .stat-l { font-size: 12px; color: var(--gt); margin-top: 2px; }
-
-    /* Toast */
     .toast {
       position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
       background: var(--td); color: #fff; padding: 10px 20px;
@@ -159,7 +143,6 @@
     .toast.show { opacity: 1; }
     .toast.error   { background: var(--rd); }
     .toast.success { background: var(--gr); }
-
     [hidden] { display: none !important; }
   </style>
 </head>
@@ -173,17 +156,16 @@
 <div class="main">
   <div class="card">
 
-    <!-- Steps indicator -->
     <div class="steps">
       <div class="si active" id="si-1"><div class="si-num">1</div><span>הגדר סוכן</span></div>
-      <div class="si"        id="si-2"><div class="si-num">2</div><span>העלה מידע</span></div>
+      <div class="si"        id="si-2"><div class="si-num">2</div><span>ידע והרשאות</span></div>
       <div class="si"        id="si-3"><div class="si-num">3</div><span>מוכן!</span></div>
     </div>
 
     <!-- Step 1: Define agent -->
     <div class="sc" id="s1">
       <div class="sc-title">הגדר את הסוכן</div>
-      <div class="sc-sub">צור סוכן חדש עם שם ותיאור, או שדרג סוכן קיים עם מידע נוסף</div>
+      <div class="sc-sub">צור סוכן חדש או שדרג סוכן קיים</div>
 
       <div class="toggle">
         <button class="tb active" id="tb-new"      onclick="setMode('new')">✨ צור סוכן חדש</button>
@@ -196,28 +178,50 @@
           <input class="inp" id="agent-name" placeholder="למשל: סוכן מכירות, סוכן לקוחות, סוכן לוגיסטיקה...">
         </div>
         <div class="field">
-          <label class="lbl">תיאור קצר (אופציונלי)</label>
+          <label class="lbl">תיאור קצר</label>
           <textarea class="ta" id="agent-desc" rows="2" placeholder="מה הסוכן הזה יעשה? לאיזה תפקיד?"></textarea>
+        </div>
+        <div class="field">
+          <label class="lbl">אחריות ומשימות</label>
+          <textarea class="ta" id="agent-resp" rows="2" placeholder="פרט את המשימות העיקריות של הסוכן..."></textarea>
         </div>
       </div>
 
       <div id="mode-existing" hidden>
         <div class="field">
           <label class="lbl">בחר סוכן קיים</label>
-          <select class="sel" id="existing-role">
+          <select class="sel" id="existing-role" onchange="loadExistingRoleData()">
             <option value="">טוען סוכנים...</option>
           </select>
         </div>
+        <div id="existing-fields" hidden>
+          <div class="field">
+            <label class="lbl">תיאור</label>
+            <textarea class="ta" id="agent-desc-ex" rows="2"></textarea>
+          </div>
+          <div class="field">
+            <label class="lbl">אחריות ומשימות</label>
+            <textarea class="ta" id="agent-resp-ex" rows="2"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-title">הוראות לסוכן (System Prompt)</div>
+      <div class="field">
+        <textarea class="ta" id="agent-sysp" rows="4"
+          placeholder="אתה סוכן AI מקצועי. הטון שלך ידידותי ומקצועי. תמיד ענה בעברית. כשלקוח שואל על מחיר, הפנה אותו למנהל..."></textarea>
+        <div class="hint">הוראות אלו עוצבות את אופי הסוכן — טון, גבולות, התנהגות</div>
       </div>
 
       <button class="btn btn-p" onclick="goStep2()">המשך ←</button>
     </div>
 
-    <!-- Step 2: Upload -->
+    <!-- Step 2: Knowledge + Permissions -->
     <div class="sc" id="s2" hidden>
-      <div class="sc-title">הכנס את המידע</div>
-      <div class="sc-sub">גרור קבצים או הדבק טקסט — מיילים, מחירונים, נהלים, חוזים, מסמכים</div>
+      <div class="sc-title">ידע והרשאות</div>
+      <div class="sc-sub">הכנס מידע עסקי והגדר לאיזה נתונים הסוכן יוכל לגשת</div>
 
+      <div class="section-title">בסיס ידע</div>
       <div class="dz" id="dropzone"
            onclick="document.getElementById('file-input').click()"
            ondragover="onDragOver(event)"
@@ -228,17 +232,28 @@
         <div class="dz-sub">.txt · .csv · .md · .eml · .log — עד 10 קבצים</div>
       </div>
       <input type="file" id="file-input" multiple accept=".txt,.csv,.md,.eml,.log" hidden onchange="onFileSelect(event)">
-
       <div class="fl" id="file-list"></div>
 
       <div class="or">או הדבק טקסט ישירות</div>
-
       <div class="field">
-        <textarea class="ta" id="paste-area" rows="6"
+        <textarea class="ta" id="paste-area" rows="5"
           placeholder="הדבק כאן מיילים, טקסט, נהלים, מחירונים, שיחות..."
           oninput="updateCounter()"></textarea>
         <div class="cc" id="char-counter">0 תווים</div>
       </div>
+
+      <div class="section-title">הרשאות גישה לנתוני המערכת</div>
+      <table class="perm-table">
+        <thead>
+          <tr>
+            <th>ישות</th>
+            <th>קריאה</th>
+            <th>כתיבה</th>
+          </tr>
+        </thead>
+        <tbody id="perm-tbody"></tbody>
+      </table>
+      <div class="hint" style="margin-bottom:16px">הסוכן יראה ויפעל רק על נתונים שהרשית לו. כתיבה כוללת קריאה אוטומטית.</div>
 
       <button class="btn btn-p" id="process-btn" onclick="startProcessing()">🚀 אמן את הסוכן</button>
       <button class="btn btn-s" onclick="showStep('s1',1)">← חזור</button>
@@ -248,12 +263,10 @@
     <div class="sc" id="s-proc" hidden>
       <div class="sc-title">מאמן את הסוכן...</div>
       <div class="sc-sub">זה לוקח כמה שניות — שווה להמתין 😊</div>
-
       <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
-
       <div class="ps-list">
-        <div class="ps" id="ps-1"><div class="ps-icon">📄</div><span>קורא מסמכים ומנקה טקסט...</span></div>
-        <div class="ps" id="ps-2"><div class="ps-icon">🧠</div><span>מנתח ידע עסקי...</span></div>
+        <div class="ps" id="ps-1"><div class="ps-icon">💾</div><span>שומר הגדרות...</span></div>
+        <div class="ps" id="ps-2"><div class="ps-icon">📄</div><span>קורא מסמכים ומנקה טקסט...</span></div>
         <div class="ps" id="ps-3"><div class="ps-icon">🔍</div><span>בונה אינדקס חכם לחיפוש...</span></div>
         <div class="ps" id="ps-4"><div class="ps-icon">✅</div><span>הסוכן מוכן!</span></div>
       </div>
@@ -264,13 +277,11 @@
       <div class="done-icon">🎉</div>
       <div class="done-title">הסוכן מוכן!</div>
       <div class="done-sub" id="done-sub">הסוכן שלך למד את המידע ומוכן לענות על שאלות</div>
-
       <div class="stats">
         <div class="stat"><div class="stat-n" id="st-chunks">0</div><div class="stat-l">קטעי ידע</div></div>
         <div class="stat"><div class="stat-n" id="st-files">0</div><div class="stat-l">מקורות</div></div>
         <div class="stat"><div class="stat-n" id="st-chars">0</div><div class="stat-l">אלפי תווים</div></div>
       </div>
-
       <button class="btn btn-p" onclick="goDashboard()">💬 דבר עם הסוכן ←</button>
       <button class="btn btn-s" onclick="goAgain()">➕ הוסף עוד מידע</button>
     </div>
@@ -289,26 +300,88 @@ var sb = supabase.createClient(SURL, SKEY);
 var CU = null;
 var mode = 'new';
 var selectedRoleId = null;
-var files = []; // [{name, size, content}]
+var files = [];
+
+var PERM_ENTITIES = [
+  {key:'shipments', label:'משלוחים'},
+  {key:'tasks',     label:'משימות'},
+  {key:'quotes',    label:'הצעות מחיר'},
+  {key:'orders',    label:'הזמנות'},
+  {key:'employees', label:'עובדים (קריאה בלבד)', noWrite: true}
+];
 
 // ── Auth ──────────────────────────────────────────────────────
 (async function init() {
   var { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; return; }
   CU = session.user;
+  renderPermTable({});
   loadExistingRoles();
 })();
 
+// ── Permissions ───────────────────────────────────────────────
+function renderPermTable(perms) {
+  var h = '';
+  PERM_ENTITIES.forEach(function(e) {
+    var r = perms[e.key] || {};
+    h += '<tr>';
+    h += '<td style="font-weight:600">' + e.label + '</td>';
+    h += '<td><input type="checkbox" id="perm-' + e.key + '-read"' + (r.read||r.write?' checked':'') + ' onchange="onPermChange(\'' + e.key + '\',\'read\')"></td>';
+    h += '<td>' + (e.noWrite ? '—' : '<input type="checkbox" id="perm-' + e.key + '-write"' + (r.write?' checked':'') + ' onchange="onPermChange(\'' + e.key + '\',\'write\')">') + '</td>';
+    h += '</tr>';
+  });
+  document.getElementById('perm-tbody').innerHTML = h;
+}
+
+function onPermChange(key, op) {
+  if (op === 'write') {
+    var w = document.getElementById('perm-' + key + '-write');
+    var r = document.getElementById('perm-' + key + '-read');
+    if (w && r && w.checked) r.checked = true;
+  }
+  if (op === 'read') {
+    var r2 = document.getElementById('perm-' + key + '-read');
+    var w2 = document.getElementById('perm-' + key + '-write');
+    if (r2 && w2 && !r2.checked) w2.checked = false;
+  }
+}
+
+function collectPermissions() {
+  var perms = {};
+  PERM_ENTITIES.forEach(function(e) {
+    var r = document.getElementById('perm-' + e.key + '-read');
+    var w = document.getElementById('perm-' + e.key + '-write');
+    perms[e.key] = { read: !!(r && r.checked), write: !!(w && w.checked) };
+  });
+  return perms;
+}
+
+// ── Existing roles ────────────────────────────────────────────
+var allRolesData = [];
+
 async function loadExistingRoles() {
-  var { data } = await sb.from('job_roles').select('id,title').eq('user_id', CU.id).order('created_at');
+  var { data } = await sb.from('job_roles').select('*').eq('user_id', CU.id).order('created_at');
+  allRolesData = data || [];
   var sel = document.getElementById('existing-role');
-  if (!data || !data.length) {
+  if (!allRolesData.length) {
     sel.innerHTML = '<option value="">אין סוכנים קיימים — צור חדש</option>';
     return;
   }
-  sel.innerHTML = data.map(function(r) {
+  sel.innerHTML = '<option value="">בחר סוכן...</option>' + allRolesData.map(function(r) {
     return '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>';
   }).join('');
+}
+
+function loadExistingRoleData() {
+  var id = document.getElementById('existing-role').value;
+  if (!id) { document.getElementById('existing-fields').hidden = true; return; }
+  var role = allRolesData.find(function(r) { return r.id === id; });
+  if (!role) return;
+  document.getElementById('agent-desc-ex').value = role.description || '';
+  document.getElementById('agent-resp-ex').value = role.responsibilities || '';
+  document.getElementById('agent-sysp').value = role.system_prompt || '';
+  renderPermTable(role.permissions || {});
+  document.getElementById('existing-fields').hidden = false;
 }
 
 // ── Mode toggle ───────────────────────────────────────────────
@@ -322,14 +395,18 @@ function setMode(m) {
 
 // ── Step 1 → 2 ────────────────────────────────────────────────
 async function goStep2() {
+  var sysp = document.getElementById('agent-sysp').value.trim();
+  var perms = collectPermissions();
+  var btn = document.querySelector('#s1 .btn-p');
+
   if (mode === 'new') {
     var name = document.getElementById('agent-name').value.trim();
     if (!name) { toast('יש להזין שם לסוכן', 'error'); return; }
     var desc = document.getElementById('agent-desc').value.trim();
-    var btn = document.querySelector('#s1 .btn-p');
+    var resp = document.getElementById('agent-resp').value.trim();
     btn.disabled = true; btn.textContent = 'יוצר סוכן...';
     var { data, error } = await sb.from('job_roles')
-      .insert({ user_id: CU.id, title: name, description: desc })
+      .insert({ user_id: CU.id, title: name, description: desc, responsibilities: resp, system_prompt: sysp, permissions: perms })
       .select().single();
     btn.disabled = false; btn.textContent = 'המשך ←';
     if (error) { toast('שגיאה: ' + error.message, 'error'); return; }
@@ -337,40 +414,33 @@ async function goStep2() {
   } else {
     selectedRoleId = document.getElementById('existing-role').value;
     if (!selectedRoleId) { toast('יש לבחור סוכן', 'error'); return; }
+    var desc2 = document.getElementById('agent-desc-ex').value.trim();
+    var resp2 = document.getElementById('agent-resp-ex').value.trim();
+    btn.disabled = true; btn.textContent = 'שומר...';
+    var { error: err2 } = await sb.from('job_roles')
+      .update({ description: desc2, responsibilities: resp2, system_prompt: sysp, permissions: perms })
+      .eq('id', selectedRoleId).eq('user_id', CU.id);
+    btn.disabled = false; btn.textContent = 'המשך ←';
+    if (err2) { toast('שגיאה: ' + err2.message, 'error'); return; }
   }
   showStep('s2', 2);
 }
 
 // ── File handling ─────────────────────────────────────────────
-function onDragOver(e) {
-  e.preventDefault();
-  document.getElementById('dropzone').classList.add('over');
-}
-function onDragLeave() {
-  document.getElementById('dropzone').classList.remove('over');
-}
-function onDrop(e) {
-  e.preventDefault();
-  document.getElementById('dropzone').classList.remove('over');
-  addFiles(Array.from(e.dataTransfer.files));
-}
-function onFileSelect(e) {
-  addFiles(Array.from(e.target.files));
-  e.target.value = '';
-}
+function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('over'); }
+function onDragLeave() { document.getElementById('dropzone').classList.remove('over'); }
+function onDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('over'); addFiles(Array.from(e.dataTransfer.files)); }
+function onFileSelect(e) { addFiles(Array.from(e.target.files)); e.target.value = ''; }
 
 function addFiles(fileObjs) {
   fileObjs.forEach(function(f) {
-    if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) {
-      toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return;
-    }
+    if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) { toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return; }
     if (files.find(function(x) { return x.name === f.name; })) return;
     if (files.length >= 10) { toast('מקסימום 10 קבצים', 'error'); return; }
     var reader = new FileReader();
     reader.onload = function(e) {
       files.push({ name: f.name, size: f.size, content: e.target.result });
-      renderFileList();
-      updateCounter();
+      renderFileList(); updateCounter();
     };
     reader.readAsText(f);
   });
@@ -378,18 +448,12 @@ function addFiles(fileObjs) {
 
 function removeFile(name) {
   files = files.filter(function(f) { return f.name !== name; });
-  renderFileList();
-  updateCounter();
+  renderFileList(); updateCounter();
 }
 
 function renderFileList() {
   document.getElementById('file-list').innerHTML = files.map(function(f) {
-    return '<div class="fi">' +
-      '<span style="font-size:16px">📄</span>' +
-      '<span class="fn">' + esc(f.name) + '</span>' +
-      '<span class="fs">' + fmtSize(f.size) + '</span>' +
-      '<button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button>' +
-      '</div>';
+    return '<div class="fi"><span style="font-size:16px">📄</span><span class="fn">' + esc(f.name) + '</span><span class="fs">' + fmtSize(f.size) + '</span><button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button></div>';
   }).join('');
 }
 
@@ -421,16 +485,16 @@ async function startProcessing() {
 
   showStep('s-proc', null);
 
-  // Animate through steps while actual API call runs in parallel
+  await animateStep('ps-1', 20, 600);
+
   var apiPromise = fetch(ROLE_WORKER_URL + '/role-index', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ role_id: selectedRoleId, manager_id: CU.id, content: combined })
   });
 
-  await animateStep('ps-1', 15, 700);
-  await animateStep('ps-2', 45, 900);
-  await animateStep('ps-3', 75, 700);
+  await animateStep('ps-2', 45, 800);
+  await animateStep('ps-3', 75, 800);
 
   var indexed = 0;
   try {
@@ -438,7 +502,6 @@ async function startProcessing() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
     indexed = data.indexed || 0;
-    // שמור גם ל-role_knowledge לשימוש בצ'אט המנהל
     await sb.from('role_knowledge').upsert({
       role_id: selectedRoleId,
       manager_id: CU.id,
@@ -454,7 +517,6 @@ async function startProcessing() {
   await animateStep('ps-4', 100, 400);
   await sleep(500);
 
-  // Populate done screen
   document.getElementById('st-chunks').textContent = indexed;
   document.getElementById('st-files').textContent  = srcCount;
   document.getElementById('st-chars').textContent  = Math.max(1, Math.round(totalChars / 1000));
@@ -470,7 +532,7 @@ async function startProcessing() {
   showStep('s-done', 3);
 }
 
-var PS_ICONS = { 'ps-1': '📄', 'ps-2': '🧠', 'ps-3': '🔍', 'ps-4': '✅' };
+var PS_ICONS = { 'ps-1': '💾', 'ps-2': '📄', 'ps-3': '🔍', 'ps-4': '✅' };
 
 async function animateStep(id, progress, delay) {
   var order = ['ps-1', 'ps-2', 'ps-3', 'ps-4'];
@@ -480,8 +542,7 @@ async function animateStep(id, progress, delay) {
     el.className = 'ps done';
     el.querySelector('.ps-icon').textContent = '✅';
   });
-  var cur = document.getElementById(id);
-  cur.className = 'ps active';
+  document.getElementById(id).className = 'ps active';
   document.getElementById('prog-fill').style.width = progress + '%';
   await sleep(delay);
 }
@@ -511,32 +572,20 @@ function showStep(id, stepNum) {
   ['s1','s2','s-proc','s-done'].forEach(function(s) {
     document.getElementById(s).hidden = s !== id;
   });
-  if (stepNum === null) {
-    // processing — no indicator change needed
-    return;
-  }
+  if (stepNum === null) return;
   ['si-1','si-2','si-3'].forEach(function(s, i) {
     var n = i + 1;
     var el = document.getElementById(s);
-    if (n < stepNum) {
-      el.className = 'si done';
-      el.querySelector('.si-num').textContent = '✓';
-    } else if (n === stepNum) {
-      el.className = 'si active';
-      el.querySelector('.si-num').textContent = n;
-    } else {
-      el.className = 'si';
-      el.querySelector('.si-num').textContent = n;
-    }
+    if (n < stepNum) { el.className = 'si done'; el.querySelector('.si-num').textContent = '✓'; }
+    else if (n === stepNum) { el.className = 'si active'; el.querySelector('.si-num').textContent = n; }
+    else { el.className = 'si'; el.querySelector('.si-num').textContent = n; }
   });
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
 function esc(s) {
-  return String(s)
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function toast(msg, type) {

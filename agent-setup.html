@@ -493,22 +493,26 @@ async function startProcessing() {
   showStep('s-proc', null);
 
   await animateStep('ps-1', 20, 600);
-
-  var apiPromise = fetch(ROLE_WORKER_URL + '/role-index', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ role_id: selectedRoleId, manager_id: CU.id, content: combined })
-  });
-
   await animateStep('ps-2', 45, 800);
   await animateStep('ps-3', 75, 800);
 
   var indexed = 0;
   try {
-    var res = await apiPromise;
-    var data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
-    indexed = data.indexed || 0;
+    var BATCH = 300000;
+    var batches = [];
+    for (var bi = 0; bi < combined.length; bi += BATCH) {
+      batches.push(combined.slice(bi, bi + BATCH));
+    }
+    for (var bi = 0; bi < batches.length; bi++) {
+      var res = await fetch(ROLE_WORKER_URL + '/role-index', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role_id: selectedRoleId, manager_id: CU.id, content: batches[bi], append: bi > 0 })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
+      indexed += data.indexed || 0;
+    }
     await sb.from('role_knowledge').upsert({
       role_id: selectedRoleId,
       manager_id: CU.id,

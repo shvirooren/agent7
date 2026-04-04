@@ -524,29 +524,51 @@ async function handleEmbed(request, env, cors) {
 // ─── POST /role-index — chunk + embed knowledge base ─────────
 
 async function handleRoleIndex(request, env, cors) {
-  const { role_id, manager_id, content } = await request.json();
+  const { role_id, manager_id, content, append = false } = await request.json();
   if (!role_id || !manager_id || !content) {
     return jsonRes({ error: 'role_id, manager_id, content required' }, cors, 400);
   }
 
-  // 1. Delete existing chunks for this role
-  await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+  // 1. Delete existing chunks only on first batch
+  if (!append) {
+    await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+  }
 
   // 2. Split into chunks
   const chunks = chunkText(content);
   if (!chunks.length) return jsonRes({ indexed: 0 }, cors);
 
-  // 3. Embed all chunks
-  const embedResult = await env.AI.run('@cf/baai/bge-m3', { text: chunks });
-  const embeddings = embedResult.data || [];
+  // 3. Get start index for append mode
+  let startIndex = 0;
+  if (append) {
+    try {
+      const existing = await sbGet(env, 'role_knowledge_chunks', {
+        select: 'chunk_index',
+        role_id,
+        manager_id,
+        order: 'chunk_index.desc',
+        limit: '1'
+      });
+      startIndex = existing.length ? (existing[0].chunk_index + 1) : 0;
+    } catch(e) {}
+  }
 
-  // 4. Insert chunks with embeddings
+  // 4. Embed in batches of 50 to avoid Worker timeouts
+  const EMBED_BATCH = 50;
+  const allEmbeddings = [];
+  for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+    const batch = chunks.slice(i, i + EMBED_BATCH);
+    const result = await env.AI.run('@cf/baai/bge-m3', { text: batch });
+    allEmbeddings.push(...(result.data || []));
+  }
+
+  // 5. Insert chunks with embeddings
   const rows = chunks.map((chunk, i) => ({
     role_id,
     manager_id,
-    chunk_index: i,
+    chunk_index: startIndex + i,
     content: chunk,
-    embedding: embeddings[i] ? JSON.stringify(embeddings[i]) : null
+    embedding: allEmbeddings[i] ? JSON.stringify(allEmbeddings[i]) : null
   }));
   await sbInsert(env, 'role_knowledge_chunks', rows);
 

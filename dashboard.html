@@ -2832,17 +2832,24 @@ async function sendRoleMsg(){
   _rcaHistory.push({role:'user',content:text});
   var typing=appendRoleMsg('חושב...','ai typing');
   var role=allRoles.find(function(r){return r.id===_rcaRoleId;});
-  var sysp=buildRoleSystemPrompt(role);
-  var fd=new FormData();
-  fd.append('title',text);
-  fd.append('desc','');
-  fd.append('history',JSON.stringify(_rcaHistory.slice(-14)));
-  fd.append('systemPrompt',sysp);
+  role.company_name='';
   try{
-    var r=await fetch(WORKER_URL,{method:'POST',body:fd});
+    var r=await fetch(ROLE_WORKER_URL+'/role-chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        role_profile:role,
+        memory:[],
+        conversation_history:_rcaHistory.slice(-14,-1),
+        new_message:text,
+        today:new Date().toLocaleDateString('he-IL'),
+        permissions:{},
+        manager_id:CU.id
+      })
+    });
     var data=await r.json();
     typing.remove();
-    var reply=(data.result||data.error||'שגיאה בקבלת תשובה').trim();
+    var reply=(data.reply||data.error||'שגיאה בקבלת תשובה').trim();
     appendRoleMsg(reply,'ai');
     _rcaHistory.push({role:'assistant',content:reply});
   }catch(e){

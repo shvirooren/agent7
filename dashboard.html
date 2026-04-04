@@ -940,6 +940,7 @@ function sp(id){
   document.getElementById('ptitle').textContent=TITLES[id]||id;
   document.querySelector('.ni[data-id="'+id+'"]').classList.add('on');
   document.getElementById('new-task-btn').style.display=id==='tasks'?'':'none';
+  if(id==='tasks')loadTasks();
   if(id==='shipments')loadShipments();
   if(id==='employees')loadEmployees();
   if(id==='quotes')loadQuotes();
@@ -2687,7 +2688,7 @@ document.getElementById('agent-chat-modal').addEventListener('click',function(e)
 //  ROLE AGENT CHAT
 // ══════════════════════════════════════════
 
-var _rcaRoleId=null, _rcaHistory=[], _rcaKnowledge='';
+var _rcaRoleId=null, _rcaHistory=[];
 
 function openRoleChat(btn){
   var roleId=btn.dataset.roleId;
@@ -2695,7 +2696,6 @@ function openRoleChat(btn){
   if(!role)return;
   _rcaRoleId=roleId;
   _rcaHistory=[];
-  _rcaKnowledge='';
   document.getElementById('rca-title').textContent=role.title;
   document.getElementById('rca-subtitle').textContent=role.description||'';
   var box=document.getElementById('rca-messages');
@@ -2703,12 +2703,11 @@ function openRoleChat(btn){
   document.getElementById('rca-input').value='';
   document.getElementById('agent-chat-modal').style.display='flex';
   setTimeout(function(){document.getElementById('rca-input').focus();},100);
-  loadRoleKnowledge(roleId,function(k){_rcaKnowledge=k;});
 }
 
 function closeRoleChat(){
   document.getElementById('agent-chat-modal').style.display='none';
-  _rcaRoleId=null; _rcaHistory=[]; _rcaKnowledge='';
+  _rcaRoleId=null; _rcaHistory=[];
 }
 
 async function trainRoleAgent(){
@@ -2731,7 +2730,7 @@ async function trainRoleAgent(){
     var r=await fetch(ROLE_WORKER_URL+'/role-learn',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({conversation_history:_rcaHistory,role_profile:role})
+      body:JSON.stringify({conversation_history:_rcaHistory,role_profile:role,agent_id:agent.id})
     });
     var data=await r.json();
     var newInsights=data.insights||[];
@@ -2819,7 +2818,7 @@ async function sendRoleMsg(){
   _rcaHistory.push({role:'user',content:text});
   var typing=appendRoleMsg('חושב...','ai typing');
   var role=allRoles.find(function(r){return r.id===_rcaRoleId;});
-  var sysp=buildRoleSystemPrompt(role,_rcaKnowledge);
+  var sysp=buildRoleSystemPrompt(role);
   var fd=new FormData();
   fd.append('title',text);
   fd.append('desc','');
@@ -2838,12 +2837,11 @@ async function sendRoleMsg(){
   }
 }
 
-function buildRoleSystemPrompt(role,knowledge){
+function buildRoleSystemPrompt(role){
   var sp='אתה סוכן AI בשם "'+( role.title||'')+'".\n';
   if(role.description)sp+='תיאור: '+role.description+'\n';
   if(role.responsibilities)sp+='אחריות: '+role.responsibilities+'\n';
   if(role.system_prompt)sp+='\nהוראות מיוחדות:\n'+role.system_prompt+'\n';
-  if(knowledge)sp+='\nבסיס ידע:\n'+knowledge.substring(0,50000)+'\n';
   sp+='\nכלל חובה: ענה תמיד בעברית. היה מקצועי ותמציתי.';
   return sp;
 }
@@ -2941,11 +2939,21 @@ function saveAgentSettings(){
     var idx=allRoles.findIndex(function(x){return x.id===_agsRoleId;});
     if(idx!==-1){allRoles[idx].system_prompt=sysp;allRoles[idx].permissions=perms;}
     if(knowledge){
+      btn.textContent='מאנדקס ידע...';
       saveRoleKnowledge(_agsRoleId,knowledge,function(){
-        btn.disabled=false; btn.textContent='שמור';
-        toast('הגדרות נשמרו ✓','success');
-        closeAgentSettings();
-        loadRoleAgents();
+        fetch(ROLE_WORKER_URL+'/role-index',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:knowledge})
+        }).then(function(r){return r.json();}).then(function(d){
+          toast('הגדרות נשמרו ✓ ('+(d.indexed||0)+' קטעי ידע עובדו)','success');
+        }).catch(function(){
+          toast('הגדרות נשמרו ✓ (אינדוקס ידע נכשל)','warning');
+        }).finally(function(){
+          btn.disabled=false; btn.textContent='שמור';
+          closeAgentSettings();
+          loadRoleAgents();
+        });
       });
     } else {
       btn.disabled=false; btn.textContent='שמור';

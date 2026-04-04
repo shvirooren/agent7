@@ -18,6 +18,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === '/role-chat')   return await handleRoleChat(request, env, cors);
+      if (url.pathname === '/role-learn')  return await handleRoleLearn(request, env, cors);
       if (url.pathname === '/role-save')   return await handleRoleSave(request, env, cors);
       if (url.pathname === '/role-index')  return await handleRoleIndex(request, env, cors);
       if (url.pathname === '/role-action') return await handleRoleAction(request, env, cors);
@@ -85,6 +86,20 @@ async function sbPatch(env, table, match, data) {
     body: JSON.stringify(data)
   });
   if (!res.ok) throw new Error(`Supabase PATCH error: ${await res.text()}`);
+}
+
+async function sbDeleteIds(env, table, ids) {
+  if (!ids.length) return;
+  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  url.searchParams.set('id', `in.(${ids.join(',')})`);
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE error: ${await res.text()}`);
 }
 
 async function sbDelete(env, table, match) {
@@ -289,7 +304,6 @@ async function handleRoleChat(request, env, cors) {
           order: 'created_at.desc',
           limit: '40'
         });
-        console.log('ships result:', JSON.stringify(ships));
         if (ships.length) {
           parts.push('משלוחים:\n' + ships.map(s =>
             `[id:${s.id}] ${s.supplier||'-'} | ${s.carrier||'-'} | סטטוס:${s.status} | מעקב:${s.tracking_number||'-'} | מ:${s.origin_country||'-'} ל:${s.destination||'-'} | יציאה:${s.departure_date||'-'} הגעה:${s.arrival_date||'-'}`
@@ -539,6 +553,58 @@ async function handleRoleIndex(request, env, cors) {
   return jsonRes({ indexed: rows.length }, cors);
 }
 
+// ─── POST /role-learn — extract insights, return to client ───
+
+async function handleRoleLearn(request, env, cors) {
+  const { conversation_history, role_profile, agent_id } = await request.json();
+
+  if (!conversation_history || conversation_history.length < 2) {
+    return jsonRes({ insights: [] }, cors);
+  }
+
+  // Fetch existing memories for dedup
+  let existingBlock = '';
+  if (agent_id) {
+    try {
+      const existing = await sbGet(env, 'role_agent_memory', {
+        select: 'content',
+        agent_id,
+        order: 'importance.desc',
+        limit: '40'
+      });
+      if (existing.length) {
+        existingBlock = '\n\nזיכרונות קיימים — אל תשכפל:\n' + existing.map(m => `• ${m.content}`).join('\n');
+      }
+    } catch(e) {}
+  }
+
+  const convText = conversation_history
+    .map(m => `${m.role === 'user' ? 'עובד' : 'סוכן'}: ${m.content}`)
+    .join('\n');
+
+  const system = `אתה מנתח שיחות עבודה. תפקידך לחלץ תובנות שיעזרו לעובד הבא בתפקיד "${role_profile?.title || ''}". החזר JSON בלבד.`;
+  const prompt = `נתח שיחה זו וחלץ עד 5 תובנות שימושיות:
+
+${convText}${existingBlock}
+
+פורמט JSON:
+{"insights":[{"category":"workflow|faq|process|contact|insight","content":"תיאור בעברית","importance":3}]}
+
+חוקים:
+- importance: 1=נמוך, 5=גבוה מאוד — שמור רק importance >= 2
+- אל תכלול תובנות הדומות לזיכרונות הקיימים`;
+
+  let insights = [];
+  try {
+    const text = await claude(env, system, [{ role: 'user', content: prompt }], 512);
+    const match = text.match(/\{[\s\S]*\}/);
+    if (match) insights = JSON.parse(match[0]).insights || [];
+  } catch(e) {}
+
+  insights = insights.filter(ins => (ins.importance || 1) >= 2);
+  return jsonRes({ insights }, cors);
+}
+
 // ─── POST /role-save — learn + save insights server-side ─────
 
 async function handleRoleSave(request, env, cors) {
@@ -614,7 +680,20 @@ ${convText}${existingBlock}
 
   await sbInsert(env, 'role_agent_memory', inserts).catch(() => {});
 
-  // 5. Bump total_conversations counter
+  // 5. Prune — keep top 60 by importance desc, created_at desc
+  try {
+    const all = await sbGet(env, 'role_agent_memory', {
+      select: 'id',
+      agent_id,
+      order: 'importance.desc,created_at.desc',
+      limit: '200'
+    });
+    if (all.length > 60) {
+      await sbDeleteIds(env, 'role_agent_memory', all.slice(60).map(m => m.id));
+    }
+  } catch(e) {}
+
+  // 6. Bump total_conversations counter
   try {
     const agents = await sbGet(env, 'role_agents', { select: 'total_conversations', id: agent_id });
     if (agents.length) {

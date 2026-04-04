@@ -493,7 +493,8 @@ async function startProcessing() {
   // ── העלאת קבצים ל-Storage ואינדוקס ──
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
-    var storagePath = CU.id + '/' + selectedRoleId + '/' + f.name;
+    var safeFilename = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+    var storagePath = CU.id + '/' + selectedRoleId + '/' + safeFilename;
 
     // 1. העלה ל-Supabase Storage
     var upRes = await sb.storage.from('role-knowledge').upload(storagePath, f.fileObj, { upsert: true });

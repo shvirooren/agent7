@@ -929,13 +929,12 @@ sb.auth.getSession().then(function(r){
     document.getElementById('unm').textContent=esc(nm);
     document.getElementById('uav').textContent=nm.charAt(0).toUpperCase();
     loadCompanyName();
+    loadEmployees();
+    setTimeout(function(){loadTasks();loadTaskEmployees();},150);
     var openRole=new URLSearchParams(window.location.search).get('open_role');
     if(openRole){
       history.replaceState(null,'',window.location.pathname);
-      goPage('agents');
-    } else {
-      loadEmployees();
-      setTimeout(function(){loadTasks();loadTaskEmployees();},150);
+      setTimeout(function(){goPage('agents');},300);
     }
 });
 

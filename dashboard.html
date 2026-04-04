@@ -931,6 +931,9 @@ sb.auth.getSession().then(function(r){
     loadCompanyName();
     loadEmployees();
     setTimeout(function(){loadTasks();loadTaskEmployees();},150);
+    if(sessionStorage.getItem('autoOpenRole')){
+      setTimeout(function(){goPage('agents');},400);
+    }
   });
 });
 

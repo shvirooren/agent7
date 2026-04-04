@@ -933,6 +933,7 @@ sb.auth.getSession().then(function(r){
     setTimeout(function(){loadTasks();loadTaskEmployees();},150);
     var openRole=new URLSearchParams(window.location.search).get('open_role');
     if(openRole){
+      window._autoOpenRoleId=openRole;
       history.replaceState(null,'',window.location.pathname);
       setTimeout(function(){goPage('agents');},300);
     }
@@ -2568,11 +2569,11 @@ function loadRoleAgents(){
       grid.innerHTML=h;
 
       // פתח צ'אט אוטומטית אם הגענו מ-agent-setup
-      var openRoleId=new URLSearchParams(window.location.search).get('open_role');
+      var openRoleId=window._autoOpenRoleId;
       if(openRoleId){
+        window._autoOpenRoleId=null;
         var btn=document.querySelector('[data-role-id="'+openRoleId+'"]');
         if(btn)openRoleChat(btn);
-        history.replaceState(null,'',window.location.pathname);
       }
     });
   });

@@ -57,7 +57,7 @@ async function claude(env, system, messages, max_tokens = 1024) {
 // ─── Supabase REST helpers (use service key) ──────────────────
 
 async function sbGet(env, table, params = {}) {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
   const noPrefix = new Set(['select', 'order', 'limit', 'offset']);
   Object.entries(params).forEach(([k, v]) => {
     url.searchParams.set(k, noPrefix.has(k) ? v : `eq.${v}`);
@@ -73,7 +73,7 @@ async function sbGet(env, table, params = {}) {
 }
 
 async function sbPatch(env, table, match, data) {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
   Object.entries(match).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
   const res = await fetch(url.toString(), {
     method: 'PATCH',
@@ -90,7 +90,7 @@ async function sbPatch(env, table, match, data) {
 
 async function sbDeleteIds(env, table, ids) {
   if (!ids.length) return;
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
   url.searchParams.set('id', `in.(${ids.join(',')})`);
   const res = await fetch(url.toString(), {
     method: 'DELETE',
@@ -103,7 +103,7 @@ async function sbDeleteIds(env, table, ids) {
 }
 
 async function sbDelete(env, table, match) {
-  const url = new URL(`${env.SUPABASE_URL}/rest/v1/${table}`);
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
   Object.entries(match).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
   const res = await fetch(url.toString(), {
     method: 'DELETE',
@@ -116,7 +116,7 @@ async function sbDelete(env, table, match) {
 }
 
 async function sbRpc(env, fn, params) {
-  const res = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/${fn}`, {
+  const res = await fetch(`${env.SUPABASE_URL.trim()}/rest/v1/rpc/${fn}`, {
     method: 'POST',
     headers: {
       'apikey': env.SUPABASE_SERVICE_KEY,

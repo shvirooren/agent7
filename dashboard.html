@@ -2915,7 +2915,7 @@ function openAgentSettings(btn){
   document.getElementById('agent-settings-modal').style.display='flex';
   loadRoleKnowledge(roleId,function(k){
     if(k){
-      st.textContent='✓ יש בסיס ידע ('+k.length.toLocaleString()+' / 50,000 תווים) — להחלפה הדבק ידע חדש';
+      st.textContent='✓ יש בסיס ידע ('+k.length.toLocaleString()+' / 150,000 תווים) — להחלפה הדבק ידע חדש';
       st.style.color='var(--gr)';
     } else {
       st.textContent='אין בסיס ידע עדיין';

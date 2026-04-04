@@ -476,7 +476,7 @@ function updateCounter() {
   var total = paste + fromFiles;
   var el = document.getElementById('char-counter');
   el.textContent = total.toLocaleString('he-IL') + ' תווים';
-  el.className = 'cc' + (total > 500000 ? ' warn' : '');
+  el.className = 'cc' + (total > 150000 ? ' warn' : '');
 }
 
 // ── Processing ────────────────────────────────────────────────
@@ -512,7 +512,7 @@ async function startProcessing() {
     await sb.from('role_knowledge').upsert({
       role_id: selectedRoleId,
       manager_id: CU.id,
-      content: combined.substring(0, 50000),
+      content: combined.substring(0, 150000),
       updated_at: new Date().toISOString()
     }, { onConflict: 'role_id' });
   } catch(e) {

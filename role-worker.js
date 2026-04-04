@@ -163,6 +163,22 @@ async function sbInsert(env, table, data) {
   if (!res.ok) throw new Error(`Supabase INSERT error: ${await res.text()}`);
 }
 
+async function sbUpsert(env, table, data, onConflict) {
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
+  url.searchParams.set('on_conflict', onConflict);
+  const res = await fetch(url.toString(), {
+    method: 'POST',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'resolution=merge-duplicates,return=minimal'
+    },
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) throw new Error(`Supabase UPSERT error: ${await res.text()}`);
+}
+
 async function verifyJwt(env, jwt) {
   const url = `${env.SUPABASE_URL.trim()}/auth/v1/user`;
   const res = await fetch(url, {
@@ -278,14 +294,19 @@ async function handleRoleChat(request, env, cors) {
       const embedRes = await env.AI.run('@cf/baai/bge-m3', { text: [new_message] });
       const queryEmbedding = embedRes.data?.[0];
       if (queryEmbedding) {
+        const dynamicCount = new_message.length < 50 ? 3 : 6;
         const chunks = await sbRpc(env, 'match_knowledge_chunks', {
-          query_embedding: queryEmbedding,
-          match_role_id: role_profile.id,
-          match_manager_id: manager_id,
-          match_count: 5
+          query_embedding:      queryEmbedding,
+          match_role_id:        role_profile.id,
+          match_manager_id:     manager_id,
+          match_count:          dynamicCount,
+          similarity_threshold: 0.25
         });
         if (chunks && chunks.length) {
-          knowledgeBlock = '\n\nבסיס ידע רלוונטי:\n' + chunks.map(c => c.content).join('\n\n---\n\n');
+          const formatted = chunks.map(c =>
+            (c.source_filename ? `[${c.source_filename}]\n` : '') + c.content
+          ).join('\n---\n');
+          knowledgeBlock = '\n\nבסיס ידע:\n' + formatted;
         }
       }
     } catch (e) { /* אם RAG נכשל — ממשיכים בלי ידע */ }
@@ -375,7 +396,7 @@ async function handleRoleChat(request, env, cors) {
 
   let memoryBlock = '';
   if (memory && memory.length > 0) {
-    const top = [...memory].sort((a, b) => b.importance - a.importance).slice(0, 30);
+    const top = [...memory].sort((a, b) => b.importance - a.importance).slice(0, 15);
     memoryBlock = '\n\nידע שנצבר מניסיון קודם:\n' + top.map(m => `• [${m.category}] ${m.content}`).join('\n');
   }
 
@@ -524,21 +545,50 @@ async function handleEmbed(request, env, cors) {
 // ─── POST /role-index — chunk + embed knowledge base ─────────
 
 async function handleRoleIndex(request, env, cors) {
-  const { role_id, manager_id, content, append = false } = await request.json();
-  if (!role_id || !manager_id || !content) {
-    return jsonRes({ error: 'role_id, manager_id, content required' }, cors, 400);
+  const { role_id, manager_id, content, storage_path, filename, file_id, append = false } = await request.json();
+  if (!role_id || !manager_id || (!content && !storage_path)) {
+    return jsonRes({ error: 'role_id, manager_id, and content or storage_path required' }, cors, 400);
   }
 
-  // 1. Delete existing chunks only on first batch
+  // 1. Resolve text content
+  let text = content;
+  if (!text && storage_path) {
+    const storageUrl = `${env.SUPABASE_URL.trim()}/storage/v1/object/${storage_path}`;
+    const fileRes = await fetch(storageUrl, {
+      headers: {
+        'apikey': env.SUPABASE_SERVICE_KEY,
+        'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+      }
+    });
+    if (!fileRes.ok) throw new Error('Storage fetch failed: ' + await fileRes.text());
+    text = await fileRes.text();
+  }
+
+  // 2. Delete existing chunks
   if (!append) {
-    await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+    if (filename) {
+      // Delete only chunks for this specific file
+      const delUrl = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/role_knowledge_chunks`);
+      delUrl.searchParams.set('role_id', `eq.${role_id}`);
+      delUrl.searchParams.set('manager_id', `eq.${manager_id}`);
+      delUrl.searchParams.set('source_filename', `eq.${filename}`);
+      await fetch(delUrl.toString(), {
+        method: 'DELETE',
+        headers: {
+          'apikey': env.SUPABASE_SERVICE_KEY,
+          'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+        }
+      });
+    } else {
+      await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+    }
   }
 
-  // 2. Split into chunks
-  const chunks = chunkText(content);
+  // 3. Split into chunks
+  const chunks = chunkText(text);
   if (!chunks.length) return jsonRes({ indexed: 0 }, cors);
 
-  // 3. Get start index for append mode
+  // 4. Get start index for append mode
   let startIndex = 0;
   if (append) {
     try {
@@ -553,7 +603,7 @@ async function handleRoleIndex(request, env, cors) {
     } catch(e) {}
   }
 
-  // 4. Embed in batches of 50 to avoid Worker timeouts
+  // 5. Embed in batches of 50 to avoid Worker timeouts
   const EMBED_BATCH = 50;
   const allEmbeddings = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
@@ -562,17 +612,26 @@ async function handleRoleIndex(request, env, cors) {
     allEmbeddings.push(...(result.data || []));
   }
 
-  // 5. Insert chunks with embeddings
+  // 6. Insert chunks with embeddings
   const rows = chunks.map((chunk, i) => ({
     role_id,
     manager_id,
     chunk_index: startIndex + i,
     content: chunk,
+    source_filename: filename || null,
     embedding: allEmbeddings[i] ? JSON.stringify(allEmbeddings[i]) : null
   }));
   await sbInsert(env, 'role_knowledge_chunks', rows);
 
-  return jsonRes({ indexed: rows.length }, cors);
+  // 7. Update file registry if file_id provided
+  if (file_id) {
+    await sbPatch(env, 'role_knowledge_files', { id: file_id }, {
+      chunk_count: rows.length,
+      indexed_at: new Date().toISOString()
+    });
+  }
+
+  return jsonRes({ indexed: rows.length, filename: filename || null }, cors);
 }
 
 // ─── POST /role-learn — extract insights, return to client ───

@@ -2812,18 +2812,36 @@ async function sendRoleMsg(){
   _rcaHistory.push({role:'user',content:text});
   var typing=appendRoleMsg('חושב...','ai typing');
   var role=allRoles.find(function(r){return r.id===_rcaRoleId;});
-  var knowledge=await new Promise(function(res){loadRoleKnowledge(_rcaRoleId,res);});
-  var sysp=buildRoleSystemPrompt(role,knowledge);
-  var fd=new FormData();
-  fd.append('title',text);
-  fd.append('desc','');
-  fd.append('history',JSON.stringify(_rcaHistory.slice(-14)));
-  fd.append('systemPrompt',sysp);
+  if(!role){typing.remove();return;}
+
+  var memRes=await sb.from('role_agent_memory').select('*')
+    .eq('agent_id',_rcaRoleId)
+    .order('importance',{ascending:false}).limit(15);
+  var memory=memRes.data||[];
+
   try{
-    var r=await fetch(WORKER_URL,{method:'POST',body:fd});
+    var r=await fetch(ROLE_WORKER_URL+'/role-chat',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        role_profile:{
+          id:               role.id,
+          title:            role.title,
+          description:      role.description||'',
+          responsibilities: role.responsibilities||'',
+          system_prompt:    role.system_prompt||''
+        },
+        memory:               memory,
+        conversation_history: _rcaHistory.slice(-14),
+        new_message:          text,
+        today:                new Date().toLocaleDateString('he-IL'),
+        permissions:          role.permissions||{},
+        manager_id:           CU.id
+      })
+    });
     var data=await r.json();
     typing.remove();
-    var reply=(data.result||data.error||'שגיאה בקבלת תשובה').trim();
+    var reply=(data.reply||data.error||'שגיאה בקבלת תשובה').trim();
     appendRoleMsg(reply,'ai');
     _rcaHistory.push({role:'assistant',content:reply});
   }catch(e){
@@ -2913,15 +2931,26 @@ function openAgentSettings(btn){
   var st=document.getElementById('ags-knowledge-status');
   st.textContent='טוען...'; st.style.color='var(--gt)';
   document.getElementById('agent-settings-modal').style.display='flex';
-  loadRoleKnowledge(roleId,function(k){
-    if(k){
-      st.textContent='✓ יש בסיס ידע ('+k.length.toLocaleString()+' / 150,000 תווים) — להחלפה הדבק ידע חדש';
-      st.style.color='var(--gr)';
-    } else {
-      st.textContent='אין בסיס ידע עדיין';
-      st.style.color='var(--gt)';
-    }
-  });
+  sb.from('role_knowledge_files').select('filename,chunk_count')
+    .eq('role_id',roleId).eq('manager_id',CU.id).then(function(r){
+      var kfiles=r.data||[];
+      if(kfiles.length){
+        var totalChunks=kfiles.reduce(function(s,f){return s+(f.chunk_count||0);},0);
+        st.textContent='✓ '+kfiles.length+' קבצים ('+totalChunks+' קטעי ידע) — להחלפה הדבק ידע חדש';
+        st.style.color='var(--gr)';
+      } else {
+        sb.from('role_knowledge_chunks').select('id',{count:'exact',head:true})
+          .eq('role_id',roleId).eq('manager_id',CU.id).then(function(cr){
+            if(cr.count){
+              st.textContent='✓ '+cr.count+' קטעי ידע';
+              st.style.color='var(--gr)';
+            } else {
+              st.textContent='אין בסיס ידע עדיין';
+              st.style.color='var(--gt)';
+            }
+          });
+      }
+    });
 }
 
 function closeAgentSettings(){
@@ -2942,20 +2971,18 @@ function saveAgentSettings(){
     if(idx!==-1){allRoles[idx].system_prompt=sysp;allRoles[idx].permissions=perms;}
     if(knowledge){
       btn.textContent='מאנדקס ידע...';
-      saveRoleKnowledge(_agsRoleId,knowledge,function(){
-        fetch(ROLE_WORKER_URL+'/role-index',{
-          method:'POST',
-          headers:{'Content-Type':'application/json'},
-          body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:knowledge})
-        }).then(function(r){return r.json();}).then(function(d){
-          toast('הגדרות נשמרו ✓ ('+(d.indexed||0)+' קטעי ידע עובדו)','success');
-        }).catch(function(){
-          toast('הגדרות נשמרו ✓ (אינדוקס ידע נכשל)','warning');
-        }).finally(function(){
-          btn.disabled=false; btn.textContent='שמור';
-          closeAgentSettings();
-          loadRoleAgents();
-        });
+      fetch(ROLE_WORKER_URL+'/role-index',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:knowledge,filename:'הדבקה ידנית',append:false})
+      }).then(function(r){return r.json();}).then(function(d){
+        toast('הגדרות נשמרו ✓ ('+(d.indexed||0)+' קטעי ידע עובדו)','success');
+      }).catch(function(){
+        toast('הגדרות נשמרו ✓ (אינדוקס ידע נכשל)','warning');
+      }).finally(function(){
+        btn.disabled=false; btn.textContent='שמור';
+        closeAgentSettings();
+        loadRoleAgents();
       });
     } else {
       btn.disabled=false; btn.textContent='שמור';

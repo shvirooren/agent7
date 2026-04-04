@@ -280,7 +280,7 @@
       <div class="stats">
         <div class="stat"><div class="stat-n" id="st-chunks">0</div><div class="stat-l">קטעי ידע</div></div>
         <div class="stat"><div class="stat-n" id="st-files">0</div><div class="stat-l">מקורות</div></div>
-        <div class="stat"><div class="stat-n" id="st-chars">0</div><div class="stat-l">אלפי תווים</div></div>
+        <div class="stat"><div class="stat-n" id="st-chars">0</div><div class="stat-l">קבצים הועלו</div></div>
       </div>
       <button class="btn btn-p" onclick="goDashboard()">💬 דבר עם הסוכן ←</button>
       <button class="btn btn-s" onclick="goAgain()">➕ הוסף עוד מידע</button>
@@ -443,13 +443,8 @@ function addFiles(fileObjs) {
   fileObjs.forEach(function(f) {
     if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) { toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return; }
     if (files.find(function(x) { return x.name === f.name; })) return;
-    if (files.length >= 10) { toast('מקסימום 10 קבצים', 'error'); return; }
-    var reader = new FileReader();
-    reader.onload = function(e) {
-      files.push({ name: f.name, size: f.size, content: e.target.result });
-      renderFileList(); updateCounter();
-    };
-    reader.readAsText(f);
+    files.push({ name: f.name, size: f.size, fileObj: f, status: 'pending' });
+    renderFileList(); updateCounter();
   });
 }
 
@@ -460,7 +455,12 @@ function removeFile(name) {
 
 function renderFileList() {
   document.getElementById('file-list').innerHTML = files.map(function(f) {
-    return '<div class="fi"><span style="font-size:16px">📄</span><span class="fn">' + esc(f.name) + '</span><span class="fs">' + fmtSize(f.size) + '</span><button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button></div>';
+    var badge = f.status === 'indexed'
+      ? '<span style="color:var(--gr);font-size:11px;font-weight:700;margin-left:6px">✓</span>'
+      : f.status === 'error'
+      ? '<span style="color:var(--rd);font-size:11px;margin-left:6px">שגיאה</span>'
+      : '';
+    return '<div class="fi"><span style="font-size:16px">📄</span><span class="fn">' + esc(f.name) + '</span><span class="fs">' + fmtSize(f.size) + '</span>' + badge + '<button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button></div>';
   }).join('');
 }
 
@@ -471,56 +471,103 @@ function fmtSize(b) {
 }
 
 function updateCounter() {
-  var paste = document.getElementById('paste-area').value.length;
-  var fromFiles = files.reduce(function(s, f) { return s + f.content.length; }, 0);
-  var total = paste + fromFiles;
   var el = document.getElementById('char-counter');
-  el.textContent = total.toLocaleString('he-IL') + ' תווים';
-  el.className = 'cc' + (total > 150000 ? ' warn' : '');
+  el.textContent = files.length ? files.length + ' קבצים' : '';
+  el.className = 'cc';
 }
 
 // ── Processing ────────────────────────────────────────────────
 async function startProcessing() {
   var paste = document.getElementById('paste-area').value.trim();
-  var fileText = files.map(function(f) { return f.content; }).join('\n\n---\n\n');
-  var combined = [fileText, paste].filter(Boolean).join('\n\n---\n\n').trim();
+  if (!files.length && !paste) { toast('יש להכניס מידע — קבצים או טקסט', 'error'); return; }
 
-  if (!combined) { toast('יש להכניס מידע — קבצים או טקסט', 'error'); return; }
-
-  var totalChars = combined.length;
   var srcCount = files.length + (paste ? 1 : 0);
-
   showStep('s-proc', null);
 
-  await animateStep('ps-1', 20, 600);
-  await animateStep('ps-2', 45, 800);
-  await animateStep('ps-3', 75, 800);
+  await animateStep('ps-1', 20, 400);
+  await animateStep('ps-2', 45, 400);
 
   var indexed = 0;
-  try {
-    var BATCH = 300000;
-    var batches = [];
-    for (var bi = 0; bi < combined.length; bi += BATCH) {
-      batches.push(combined.slice(bi, bi + BATCH));
+  var firstIndex = true;
+
+  // ── העלאת קבצים ל-Storage ואינדוקס ──
+  for (var i = 0; i < files.length; i++) {
+    var f = files[i];
+    var storagePath = CU.id + '/' + selectedRoleId + '/' + f.name;
+
+    // 1. העלה ל-Supabase Storage
+    var upRes = await sb.storage.from('role-knowledge').upload(storagePath, f.fileObj, { upsert: true });
+    if (upRes.error) {
+      toast('שגיאה בהעלאת ' + f.name + ': ' + upRes.error.message, 'error');
+      files[i].status = 'error'; renderFileList(); continue;
     }
-    for (var bi = 0; bi < batches.length; bi++) {
-      var res = await fetch(ROLE_WORKER_URL + '/role-index', {
+
+    // 2. רשום בטבלת הקבצים
+    var regRes = await sb.from('role_knowledge_files').upsert({
+      role_id:      selectedRoleId,
+      manager_id:   CU.id,
+      filename:     f.name,
+      file_size:    f.size,
+      storage_path: storagePath
+    }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
+
+    if (regRes.error || !regRes.data) {
+      toast('שגיאה ברישום ' + f.name, 'error');
+      files[i].status = 'error'; renderFileList(); continue;
+    }
+
+    // 3. שלח ל-Worker לאינדוקס מ-Storage
+    try {
+      var idxRes = await fetch(ROLE_WORKER_URL + '/role-index', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ role_id: selectedRoleId, manager_id: CU.id, content: batches[bi], append: bi > 0 })
+        body: JSON.stringify({
+          role_id:      selectedRoleId,
+          manager_id:   CU.id,
+          storage_path: 'role-knowledge/' + storagePath,
+          filename:     f.name,
+          file_id:      regRes.data.id,
+          append:       !firstIndex
+        })
       });
-      var data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
-      indexed += data.indexed || 0;
+      var idxData = await idxRes.json();
+      if (!idxRes.ok) throw new Error(idxData.error || 'שגיאת שרת');
+      indexed += idxData.indexed || 0;
+      files[i].status = 'indexed';
+      firstIndex = false;
+    } catch(e) {
+      files[i].status = 'error';
+      toast('שגיאה באינדוקס ' + f.name + ': ' + e.message, 'error');
     }
-    await sb.from('role_knowledge').upsert({
-      role_id: selectedRoleId,
-      manager_id: CU.id,
-      content: combined.substring(0, 150000),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'role_id' });
-  } catch(e) {
-    toast('שגיאה: ' + e.message, 'error');
+    renderFileList();
+  }
+
+  await animateStep('ps-3', 75, 400);
+
+  // ── טקסט הדבוק — שלח ישירות כ-content ──
+  if (paste) {
+    var BATCH = 300000;
+    try {
+      for (var bi = 0; bi < paste.length; bi += BATCH) {
+        var res = await fetch(ROLE_WORKER_URL + '/role-index', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            role_id:    selectedRoleId,
+            manager_id: CU.id,
+            content:    paste.slice(bi, bi + BATCH),
+            filename:   'הדבקה ידנית',
+            append:     !(firstIndex && bi === 0)
+          })
+        });
+        var d = await res.json();
+        if (res.ok) { indexed += d.indexed || 0; firstIndex = false; }
+      }
+    } catch(e) { toast('שגיאה באינדוקס טקסט: ' + e.message, 'error'); }
+  }
+
+  if (indexed === 0 && firstIndex) {
+    toast('לא הצלחנו לאנדקס את המידע', 'error');
     showStep('s2', 2);
     return;
   }
@@ -530,7 +577,7 @@ async function startProcessing() {
 
   document.getElementById('st-chunks').textContent = indexed;
   document.getElementById('st-files').textContent  = srcCount;
-  document.getElementById('st-chars').textContent  = Math.max(1, Math.round(totalChars / 1000));
+  document.getElementById('st-chars').textContent  = srcCount;
 
   var roleName = mode === 'new'
     ? document.getElementById('agent-name').value.trim()

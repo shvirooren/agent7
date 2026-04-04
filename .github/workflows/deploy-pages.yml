@@ -15,7 +15,7 @@ jobs:
       - name: Deploy to Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_PAGES_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_ACCOUNT_ID: 4d0d546524d1814d3e99474748c03be6
         run: |
           npm install -g wrangler
           wrangler pages deploy . --project-name=agent7 --commit-dirty=true

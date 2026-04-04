@@ -452,7 +452,10 @@ body{overflow-x:hidden}
       <div class="card" style="margin-bottom:16px">
         <div class="ch">
           <div class="ct">סוכני AI לפי תפקיד</div>
-          <button class="bot" onclick="toggleRoleForm()">+ תפקיד חדש</button>
+          <div style="display:flex;gap:8px">
+            <button class="bsv" onclick="window.location.href='agent-setup.html'" style="font-size:13px;padding:7px 14px">🚀 הגדר סוכן חדש</button>
+            <button class="bot" onclick="toggleRoleForm()">+ תפקיד ידני</button>
+          </div>
         </div>
         <div class="cb">
           <!-- טופס תפקיד חדש -->

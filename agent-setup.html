@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>הגדר סוכן — Agent 7</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bd: #003366; --bm: #0055A4; --ba: #009FE3;
+      --gr: #28a745; --or: #fd7e14; --rd: #dc3545;
+      --gl: #F5F7FA; --gm: #E2E8F0; --gt: #94A3B8; --td: #2D3748;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--gl); color: var(--td);
+      direction: rtl; min-height: 100vh; display: flex; flex-direction: column;
+    }
+
+    /* Header */
+    .hdr {
+      background: var(--bd); color: #fff;
+      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+    }
+    .logo { font-size: 20px; font-weight: 800; color: var(--ba); }
+    .hdr-sub { font-size: 14px; opacity: .7; }
+
+    /* Main */
+    .main {
+      flex: 1; display: flex; align-items: flex-start;
+      justify-content: center; padding: 40px 16px;
+    }
+    .card {
+      background: #fff; border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.08);
+      width: 100%; max-width: 620px; overflow: hidden;
+    }
+
+    /* Steps indicator */
+    .steps {
+      display: flex; background: var(--gl);
+      border-bottom: 1px solid var(--gm); padding: 14px 24px;
+    }
+    .si { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gt); }
+    .si.active { color: var(--bm); font-weight: 700; }
+    .si.done  { color: var(--gr); }
+    .si-num {
+      width: 24px; height: 24px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      background: var(--gm); color: var(--gt); flex-shrink: 0;
+    }
+    .si.active .si-num { background: var(--bm); color: #fff; }
+    .si.done  .si-num  { background: var(--gr); color: #fff; }
+
+    /* Step content */
+    .sc { padding: 32px 24px; }
+    .sc-title { font-size: 20px; font-weight: 800; color: var(--bd); margin-bottom: 6px; }
+    .sc-sub   { font-size: 14px; color: var(--gt); margin-bottom: 24px; line-height: 1.6; }
+
+    /* Toggle */
+    .toggle { display: flex; gap: 8px; margin-bottom: 20px; }
+    .tb {
+      flex: 1; padding: 10px; border: 1.5px solid var(--gm); border-radius: 8px;
+      background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--gt); text-align: center; transition: all .2s; font-family: inherit;
+    }
+    .tb.active { border-color: var(--bm); background: #EBF5FF; color: var(--bm); }
+
+    /* Form */
+    .field { margin-bottom: 16px; }
+    .lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
+    .inp, .ta, .sel {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--gm);
+      border-radius: 8px; font-size: 14px; font-family: inherit;
+      direction: rtl; color: var(--td); background: #fff; transition: border-color .2s;
+    }
+    .inp:focus, .ta:focus, .sel:focus { outline: none; border-color: var(--ba); }
+    .ta { resize: vertical; min-height: 80px; }
+
+    /* Drop zone */
+    .dz {
+      border: 2px dashed var(--gm); border-radius: 12px;
+      padding: 36px 24px; text-align: center;
+      cursor: pointer; transition: all .2s; margin-bottom: 16px;
+    }
+    .dz:hover, .dz.over { border-color: var(--ba); background: #F0F9FF; }
+    .dz-icon  { font-size: 40px; margin-bottom: 10px; }
+    .dz-title { font-size: 15px; font-weight: 600; margin-bottom: 4px; }
+    .dz-sub   { font-size: 12px; color: var(--gt); }
+
+    /* File list */
+    .fl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .fi {
+      display: flex; align-items: center; gap: 8px;
+      padding: 8px 12px; background: var(--gl); border-radius: 8px; font-size: 13px;
+    }
+    .fn { flex: 1; font-weight: 500; }
+    .fs { color: var(--gt); font-size: 12px; }
+    .frm { cursor: pointer; color: var(--rd); font-size: 18px; background: none; border: none; line-height: 1; }
+
+    /* Char counter */
+    .cc { font-size: 12px; color: var(--gt); text-align: left; margin-top: 4px; }
+    .cc.warn { color: var(--or); }
+
+    /* OR separator */
+    .or {
+      display: flex; align-items: center; gap: 12px;
+      margin: 14px 0; color: var(--gt); font-size: 12px;
+    }
+    .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--gm); }
+
+    /* Buttons */
+    .btn {
+      padding: 12px 24px; border-radius: 8px; font-size: 14px;
+      font-weight: 700; cursor: pointer; border: none;
+      font-family: inherit; transition: all .2s; width: 100%;
+    }
+    .btn-p { background: var(--bm); color: #fff; margin-top: 8px; }
+    .btn-p:hover:not(:disabled) { background: var(--bd); }
+    .btn-p:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-s {
+      background: var(--gl); color: var(--td);
+      border: 1.5px solid var(--gm); margin-top: 8px;
+    }
+    .btn-s:hover { background: var(--gm); }
+
+    /* Processing */
+    .prog-bar { height: 6px; background: var(--gm); border-radius: 3px; overflow: hidden; margin: 20px 0; }
+    .prog-fill { height: 100%; background: var(--ba); border-radius: 3px; transition: width .5s ease; }
+
+    .ps-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+    .ps {
+      display: flex; align-items: center; gap: 12px;
+      padding: 12px 16px; border-radius: 10px;
+      background: var(--gl); font-size: 14px; color: var(--gt); transition: all .3s;
+    }
+    .ps.active { background: #EBF5FF; color: var(--bm); font-weight: 600; }
+    .ps.done   { background: #F0FFF4; color: var(--gr); }
+    .ps-icon   { font-size: 22px; width: 30px; text-align: center; flex-shrink: 0; }
+
+    /* Done */
+    .done-icon  { font-size: 64px; text-align: center; margin-bottom: 16px; }
+    .done-title { font-size: 22px; font-weight: 800; color: var(--bd); text-align: center; margin-bottom: 6px; }
+    .done-sub   { font-size: 14px; color: var(--gt); text-align: center; margin-bottom: 24px; }
+    .stats { display: flex; gap: 12px; margin-bottom: 24px; }
+    .stat { flex: 1; background: var(--gl); border-radius: 10px; padding: 16px; text-align: center; }
+    .stat-n { font-size: 30px; font-weight: 800; color: var(--bm); }
+    .stat-l { font-size: 12px; color: var(--gt); margin-top: 2px; }
+
+    /* Toast */
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: var(--td); color: #fff; padding: 10px 20px;
+      border-radius: 8px; font-size: 13px; z-index: 9999;
+      opacity: 0; transition: opacity .3s; pointer-events: none;
+    }
+    .toast.show { opacity: 1; }
+    .toast.error   { background: var(--rd); }
+    .toast.success { background: var(--gr); }
+
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="logo">Agent 7</div>
+  <div class="hdr-sub">הגדר סוכן AI לעסק שלך</div>
+</div>
+
+<div class="main">
+  <div class="card">
+
+    <!-- Steps indicator -->
+    <div class="steps">
+      <div class="si active" id="si-1"><div class="si-num">1</div><span>הגדר סוכן</span></div>
+      <div class="si"        id="si-2"><div class="si-num">2</div><span>העלה מידע</span></div>
+      <div class="si"        id="si-3"><div class="si-num">3</div><span>מוכן!</span></div>
+    </div>
+
+    <!-- Step 1: Define agent -->
+    <div class="sc" id="s1">
+      <div class="sc-title">הגדר את הסוכן</div>
+      <div class="sc-sub">צור סוכן חדש עם שם ותיאור, או שדרג סוכן קיים עם מידע נוסף</div>
+
+      <div class="toggle">
+        <button class="tb active" id="tb-new"      onclick="setMode('new')">✨ צור סוכן חדש</button>
+        <button class="tb"        id="tb-existing" onclick="setMode('existing')">📂 שדרג קיים</button>
+      </div>
+
+      <div id="mode-new">
+        <div class="field">
+          <label class="lbl">שם הסוכן <span style="color:var(--rd)">*</span></label>
+          <input class="inp" id="agent-name" placeholder="למשל: סוכן מכירות, סוכן לקוחות, סוכן לוגיסטיקה...">
+        </div>
+        <div class="field">
+          <label class="lbl">תיאור קצר (אופציונלי)</label>
+          <textarea class="ta" id="agent-desc" rows="2" placeholder="מה הסוכן הזה יעשה? לאיזה תפקיד?"></textarea>
+        </div>
+      </div>
+
+      <div id="mode-existing" hidden>
+        <div class="field">
+          <label class="lbl">בחר סוכן קיים</label>
+          <select class="sel" id="existing-role">
+            <option value="">טוען סוכנים...</option>
+          </select>
+        </div>
+      </div>
+
+      <button class="btn btn-p" onclick="goStep2()">המשך ←</button>
+    </div>
+
+    <!-- Step 2: Upload -->
+    <div class="sc" id="s2" hidden>
+      <div class="sc-title">הכנס את המידע</div>
+      <div class="sc-sub">גרור קבצים או הדבק טקסט — מיילים, מחירונים, נהלים, חוזים, מסמכים</div>
+
+      <div class="dz" id="dropzone"
+           onclick="document.getElementById('file-input').click()"
+           ondragover="onDragOver(event)"
+           ondragleave="onDragLeave()"
+           ondrop="onDrop(event)">
+        <div class="dz-icon">📂</div>
+        <div class="dz-title">גרור קבצים לכאן</div>
+        <div class="dz-sub">.txt · .csv · .md · .eml · .log — עד 10 קבצים</div>
+      </div>
+      <input type="file" id="file-input" multiple accept=".txt,.csv,.md,.eml,.log" hidden onchange="onFileSelect(event)">
+
+      <div class="fl" id="file-list"></div>
+
+      <div class="or">או הדבק טקסט ישירות</div>
+
+      <div class="field">
+        <textarea class="ta" id="paste-area" rows="6"
+          placeholder="הדבק כאן מיילים, טקסט, נהלים, מחירונים, שיחות..."
+          oninput="updateCounter()"></textarea>
+        <div class="cc" id="char-counter">0 תווים</div>
+      </div>
+
+      <button class="btn btn-p" id="process-btn" onclick="startProcessing()">🚀 אמן את הסוכן</button>
+      <button class="btn btn-s" onclick="showStep('s1',1)">← חזור</button>
+    </div>
+
+    <!-- Processing -->
+    <div class="sc" id="s-proc" hidden>
+      <div class="sc-title">מאמן את הסוכן...</div>
+      <div class="sc-sub">זה לוקח כמה שניות — שווה להמתין 😊</div>
+
+      <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+
+      <div class="ps-list">
+        <div class="ps" id="ps-1"><div class="ps-icon">📄</div><span>קורא מסמכים ומנקה טקסט...</span></div>
+        <div class="ps" id="ps-2"><div class="ps-icon">🧠</div><span>מנתח ידע עסקי...</span></div>
+        <div class="ps" id="ps-3"><div class="ps-icon">🔍</div><span>בונה אינדקס חכם לחיפוש...</span></div>
+        <div class="ps" id="ps-4"><div class="ps-icon">✅</div><span>הסוכן מוכן!</span></div>
+      </div>
+    </div>
+
+    <!-- Done -->
+    <div class="sc" id="s-done" hidden>
+      <div class="done-icon">🎉</div>
+      <div class="done-title">הסוכן מוכן!</div>
+      <div class="done-sub" id="done-sub">הסוכן שלך למד את המידע ומוכן לענות על שאלות</div>
+
+      <div class="stats">
+        <div class="stat"><div class="stat-n" id="st-chunks">0</div><div class="stat-l">קטעי ידע</div></div>
+        <div class="stat"><div class="stat-n" id="st-files">0</div><div class="stat-l">מקורות</div></div>
+        <div class="stat"><div class="stat-n" id="st-chars">0</div><div class="stat-l">אלפי תווים</div></div>
+      </div>
+
+      <button class="btn btn-p" onclick="goDashboard()">💬 דבר עם הסוכן ←</button>
+      <button class="btn btn-s" onclick="goAgain()">➕ הוסף עוד מידע</button>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var SURL = 'https://gmjfhjnwoymmxfqdazqf.supabase.co';
+var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
+var ROLE_WORKER_URL = 'https://agent7-rules.shvirooren.workers.dev';
+
+var sb = supabase.createClient(SURL, SKEY);
+var CU = null;
+var mode = 'new';
+var selectedRoleId = null;
+var files = []; // [{name, size, content}]
+
+// ── Auth ──────────────────────────────────────────────────────
+(async function init() {
+  var { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.href = 'login.html'; return; }
+  CU = session.user;
+  loadExistingRoles();
+})();
+
+async function loadExistingRoles() {
+  var { data } = await sb.from('job_roles').select('id,title').eq('user_id', CU.id).order('created_at');
+  var sel = document.getElementById('existing-role');
+  if (!data || !data.length) {
+    sel.innerHTML = '<option value="">אין סוכנים קיימים — צור חדש</option>';
+    return;
+  }
+  sel.innerHTML = data.map(function(r) {
+    return '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>';
+  }).join('');
+}
+
+// ── Mode toggle ───────────────────────────────────────────────
+function setMode(m) {
+  mode = m;
+  document.getElementById('tb-new').classList.toggle('active', m === 'new');
+  document.getElementById('tb-existing').classList.toggle('active', m === 'existing');
+  document.getElementById('mode-new').hidden = m !== 'new';
+  document.getElementById('mode-existing').hidden = m !== 'existing';
+}
+
+// ── Step 1 → 2 ────────────────────────────────────────────────
+async function goStep2() {
+  if (mode === 'new') {
+    var name = document.getElementById('agent-name').value.trim();
+    if (!name) { toast('יש להזין שם לסוכן', 'error'); return; }
+    var desc = document.getElementById('agent-desc').value.trim();
+    var btn = document.querySelector('#s1 .btn-p');
+    btn.disabled = true; btn.textContent = 'יוצר סוכן...';
+    var { data, error } = await sb.from('job_roles')
+      .insert({ user_id: CU.id, title: name, description: desc })
+      .select().single();
+    btn.disabled = false; btn.textContent = 'המשך ←';
+    if (error) { toast('שגיאה: ' + error.message, 'error'); return; }
+    selectedRoleId = data.id;
+  } else {
+    selectedRoleId = document.getElementById('existing-role').value;
+    if (!selectedRoleId) { toast('יש לבחור סוכן', 'error'); return; }
+  }
+  showStep('s2', 2);
+}
+
+// ── File handling ─────────────────────────────────────────────
+function onDragOver(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.add('over');
+}
+function onDragLeave() {
+  document.getElementById('dropzone').classList.remove('over');
+}
+function onDrop(e) {
+  e.preventDefault();
+  document.getElementById('dropzone').classList.remove('over');
+  addFiles(Array.from(e.dataTransfer.files));
+}
+function onFileSelect(e) {
+  addFiles(Array.from(e.target.files));
+  e.target.value = '';
+}
+
+function addFiles(fileObjs) {
+  fileObjs.forEach(function(f) {
+    if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) {
+      toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return;
+    }
+    if (files.find(function(x) { return x.name === f.name; })) return;
+    if (files.length >= 10) { toast('מקסימום 10 קבצים', 'error'); return; }
+    var reader = new FileReader();
+    reader.onload = function(e) {
+      files.push({ name: f.name, size: f.size, content: e.target.result });
+      renderFileList();
+      updateCounter();
+    };
+    reader.readAsText(f);
+  });
+}
+
+function removeFile(name) {
+  files = files.filter(function(f) { return f.name !== name; });
+  renderFileList();
+  updateCounter();
+}
+
+function renderFileList() {
+  document.getElementById('file-list').innerHTML = files.map(function(f) {
+    return '<div class="fi">' +
+      '<span style="font-size:16px">📄</span>' +
+      '<span class="fn">' + esc(f.name) + '</span>' +
+      '<span class="fs">' + fmtSize(f.size) + '</span>' +
+      '<button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button>' +
+      '</div>';
+  }).join('');
+}
+
+function fmtSize(b) {
+  if (b < 1024) return b + 'B';
+  if (b < 1048576) return Math.round(b / 1024) + 'KB';
+  return (b / 1048576).toFixed(1) + 'MB';
+}
+
+function updateCounter() {
+  var paste = document.getElementById('paste-area').value.length;
+  var fromFiles = files.reduce(function(s, f) { return s + f.content.length; }, 0);
+  var total = paste + fromFiles;
+  var el = document.getElementById('char-counter');
+  el.textContent = total.toLocaleString('he-IL') + ' תווים';
+  el.className = 'cc' + (total > 500000 ? ' warn' : '');
+}
+
+// ── Processing ────────────────────────────────────────────────
+async function startProcessing() {
+  var paste = document.getElementById('paste-area').value.trim();
+  var fileText = files.map(function(f) { return f.content; }).join('\n\n---\n\n');
+  var combined = [fileText, paste].filter(Boolean).join('\n\n---\n\n').trim();
+
+  if (!combined) { toast('יש להכניס מידע — קבצים או טקסט', 'error'); return; }
+
+  var totalChars = combined.length;
+  var srcCount = files.length + (paste ? 1 : 0);
+
+  showStep('s-proc', null);
+
+  // Animate through steps while actual API call runs in parallel
+  var apiPromise = fetch(ROLE_WORKER_URL + '/role-index', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role_id: selectedRoleId, manager_id: CU.id, content: combined })
+  });
+
+  await animateStep('ps-1', 15, 700);
+  await animateStep('ps-2', 45, 900);
+  await animateStep('ps-3', 75, 700);
+
+  var indexed = 0;
+  try {
+    var res = await apiPromise;
+    var data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
+    indexed = data.indexed || 0;
+  } catch(e) {
+    toast('שגיאה: ' + e.message, 'error');
+    showStep('s2', 2);
+    return;
+  }
+
+  await animateStep('ps-4', 100, 400);
+  await sleep(500);
+
+  // Populate done screen
+  document.getElementById('st-chunks').textContent = indexed;
+  document.getElementById('st-files').textContent  = srcCount;
+  document.getElementById('st-chars').textContent  = Math.max(1, Math.round(totalChars / 1000));
+
+  var roleName = mode === 'new'
+    ? document.getElementById('agent-name').value.trim()
+    : (function() {
+        var sel = document.getElementById('existing-role');
+        return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
+      })();
+  document.getElementById('done-sub').textContent = '"' + roleName + '" יודע עכשיו לענות על שאלות מהמידע שהכנסת';
+
+  showStep('s-done', 3);
+}
+
+var PS_ICONS = { 'ps-1': '📄', 'ps-2': '🧠', 'ps-3': '🔍', 'ps-4': '✅' };
+
+async function animateStep(id, progress, delay) {
+  var order = ['ps-1', 'ps-2', 'ps-3', 'ps-4'];
+  var idx = order.indexOf(id);
+  order.slice(0, idx).forEach(function(s) {
+    var el = document.getElementById(s);
+    el.className = 'ps done';
+    el.querySelector('.ps-icon').textContent = '✅';
+  });
+  var cur = document.getElementById(id);
+  cur.className = 'ps active';
+  document.getElementById('prog-fill').style.width = progress + '%';
+  await sleep(delay);
+}
+
+// ── Navigation ────────────────────────────────────────────────
+function goDashboard() { window.location.href = 'dashboard.html'; }
+
+function goAgain() {
+  files = [];
+  document.getElementById('paste-area').value = '';
+  document.getElementById('file-list').innerHTML = '';
+  document.getElementById('char-counter').textContent = '0 תווים';
+  document.getElementById('prog-fill').style.width = '0%';
+  ['ps-1','ps-2','ps-3','ps-4'].forEach(function(s) {
+    var el = document.getElementById(s);
+    el.className = 'ps';
+    el.querySelector('.ps-icon').textContent = PS_ICONS[s];
+  });
+  showStep('s2', 2);
+}
+
+// ── UI helpers ────────────────────────────────────────────────
+function showStep(id, stepNum) {
+  ['s1','s2','s-proc','s-done'].forEach(function(s) {
+    document.getElementById(s).hidden = s !== id;
+  });
+  if (stepNum === null) {
+    // processing — no indicator change needed
+    return;
+  }
+  ['si-1','si-2','si-3'].forEach(function(s, i) {
+    var n = i + 1;
+    var el = document.getElementById(s);
+    if (n < stepNum) {
+      el.className = 'si done';
+      el.querySelector('.si-num').textContent = '✓';
+    } else if (n === stepNum) {
+      el.className = 'si active';
+      el.querySelector('.si-num').textContent = n;
+    } else {
+      el.className = 'si';
+      el.querySelector('.si-num').textContent = n;
+    }
+  });
+}
+
+function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
+
+function esc(s) {
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toast(msg, type) {
+  var el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(el._t);
+  el._t = setTimeout(function() { el.className = 'toast'; }, 3000);
+}
+</script>
+</body>
+</html>

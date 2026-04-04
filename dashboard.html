@@ -2832,7 +2832,8 @@ async function sendRoleMsg(){
   _rcaHistory.push({role:'user',content:text});
   var typing=appendRoleMsg('חושב...','ai typing');
   var role=allRoles.find(function(r){return r.id===_rcaRoleId;});
-  var sysp=buildRoleSystemPrompt(role);
+  var knowledge=await new Promise(function(res){loadRoleKnowledge(_rcaRoleId,res);});
+  var sysp=buildRoleSystemPrompt(role,knowledge);
   var fd=new FormData();
   fd.append('title',text);
   fd.append('desc','');
@@ -2851,12 +2852,13 @@ async function sendRoleMsg(){
   }
 }
 
-function buildRoleSystemPrompt(role){
+function buildRoleSystemPrompt(role,knowledge){
   var sp='אתה סוכן AI בשם "'+( role.title||'')+'".\n';
   if(role.description)sp+='תיאור: '+role.description+'\n';
   if(role.responsibilities)sp+='אחריות: '+role.responsibilities+'\n';
   if(role.system_prompt)sp+='\nהוראות מיוחדות:\n'+role.system_prompt+'\n';
-  sp+='\nכלל חובה: ענה תמיד בעברית. היה מקצועי ותמציתי.';
+  if(knowledge)sp+='\n\nבסיס ידע:\n'+knowledge;
+  sp+='\n\nכלל חובה: ענה תמיד בעברית. היה מקצועי ותמציתי.';
   return sp;
 }
 

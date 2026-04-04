@@ -438,6 +438,13 @@ async function startProcessing() {
     var data = await res.json();
     if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
     indexed = data.indexed || 0;
+    // שמור גם ל-role_knowledge לשימוש בצ'אט המנהל
+    await sb.from('role_knowledge').upsert({
+      role_id: selectedRoleId,
+      manager_id: CU.id,
+      content: combined.substring(0, 50000),
+      updated_at: new Date().toISOString()
+    }, { onConflict: 'role_id' });
   } catch(e) {
     toast('שגיאה: ' + e.message, 'error');
     showStep('s2', 2);

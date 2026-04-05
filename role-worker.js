@@ -604,7 +604,6 @@ async function handleRoleIndex(request, env, cors) {
     manager_id,
     chunk_index: startIndex + i,
     content: chunk,
-    source_filename: filename || null,
     embedding: allEmbeddings[i] ? JSON.stringify(allEmbeddings[i]) : null
   }));
   await sbInsert(env, 'role_knowledge_chunks', rows);

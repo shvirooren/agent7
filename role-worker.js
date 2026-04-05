@@ -300,7 +300,7 @@ async function handleRoleChat(request, env, cors) {
       const embedRes = await env.AI.run('@cf/baai/bge-m3', { text: [new_message] });
       const queryEmbedding = embedRes.data?.[0];
       if (queryEmbedding) {
-        const dynamicCount = new_message.length < 30 ? 6 : 12;
+        const dynamicCount = new_message.length < 30 ? 4 : 8;
         const chunks = await sbRpc(env, 'match_knowledge_chunks_hybrid', {
           query_embedding:      queryEmbedding,
           query_text:           new_message,
@@ -313,7 +313,8 @@ async function handleRoleChat(request, env, cors) {
           const formatted = chunks.map(c =>
             (c.source_filename ? `[${c.source_filename}]\n` : '') + c.content
           ).join('\n---\n');
-          knowledgeBlock = '\n\nבסיס ידע:\n' + formatted;
+          // cap knowledge block at 3000 chars to limit token usage
+          knowledgeBlock = '\n\nבסיס ידע:\n' + formatted.slice(0, 3000);
         }
       }
     } catch (e) { /* RAG failed silently */ }

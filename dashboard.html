@@ -2816,7 +2816,7 @@ async function sendRoleMsg(){
 
   var memRes=await sb.from('role_agent_memory').select('*')
     .eq('agent_id',_rcaRoleId)
-    .order('importance',{ascending:false}).limit(15);
+    .order('importance',{ascending:false}).limit(8);
   var memory=memRes.data||[];
 
   try{
@@ -2832,7 +2832,7 @@ async function sendRoleMsg(){
           system_prompt:    role.system_prompt||''
         },
         memory:               memory,
-        conversation_history: _rcaHistory.slice(-14),
+        conversation_history: _rcaHistory.slice(-8),
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
         permissions:          role.permissions||{},

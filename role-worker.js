@@ -130,7 +130,7 @@ async function sbRpc(env, fn, params) {
 }
 
 // Split text into ~500-word chunks, works for both paragraph and line-per-message formats (e.g. WhatsApp)
-function chunkText(text, wordsPerChunk = 500) {
+function chunkText(text, wordsPerChunk = 150) {
   // Try paragraph splits first; fall back to single-line splits for chat exports
   let segments = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
   if (segments.length <= 3 && text.length > 2000) {

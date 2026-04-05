@@ -566,22 +566,8 @@ async function handleRoleIndex(request, env, cors) {
 
   // 2. Delete existing chunks
   if (!append) {
-    if (filename) {
-      // Delete only chunks for this specific file
-      const delUrl = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/role_knowledge_chunks`);
-      delUrl.searchParams.set('role_id', `eq.${role_id}`);
-      delUrl.searchParams.set('manager_id', `eq.${manager_id}`);
-      delUrl.searchParams.set('source_filename', `eq.${filename}`);
-      await fetch(delUrl.toString(), {
-        method: 'DELETE',
-        headers: {
-          'apikey': env.SUPABASE_SERVICE_KEY,
-          'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
-        }
-      });
-    } else {
-      await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
-    }
+    // Always delete all chunks for this role on first batch
+    await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
   }
 
   // 3. Split into chunks

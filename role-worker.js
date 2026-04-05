@@ -129,23 +129,29 @@ async function sbRpc(env, fn, params) {
   return res.json();
 }
 
-// Split text into ~500-word chunks, preferring paragraph breaks
+// Split text into ~500-word chunks, works for both paragraph and line-per-message formats (e.g. WhatsApp)
 function chunkText(text, wordsPerChunk = 500) {
-  const paragraphs = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  // Try paragraph splits first; fall back to single-line splits for chat exports
+  let segments = text.split(/\n{2,}/).map(p => p.trim()).filter(Boolean);
+  if (segments.length <= 3 && text.length > 2000) {
+    // Likely single-newline format (WhatsApp, logs) — split on every line
+    segments = text.split(/\n/).map(p => p.trim()).filter(Boolean);
+  }
+  const MAX_CHUNK_CHARS = 4000; // safety cap for embedding model
   const chunks = [];
   let current = [];
   let wordCount = 0;
-  for (const para of paragraphs) {
-    const words = para.split(/\s+/).length;
-    if (wordCount + words > wordsPerChunk && current.length) {
-      chunks.push(current.join('\n\n'));
+  for (const seg of segments) {
+    const words = seg.split(/\s+/).length;
+    if ((wordCount + words > wordsPerChunk || current.join('\n').length + seg.length > MAX_CHUNK_CHARS) && current.length) {
+      chunks.push(current.join('\n'));
       current = [];
       wordCount = 0;
     }
-    current.push(para);
+    current.push(seg);
     wordCount += words;
   }
-  if (current.length) chunks.push(current.join('\n\n'));
+  if (current.length) chunks.push(current.join('\n'));
   return chunks;
 }
 

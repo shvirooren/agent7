@@ -300,13 +300,13 @@ async function handleRoleChat(request, env, cors) {
       const embedRes = await env.AI.run('@cf/baai/bge-m3', { text: [new_message] });
       const queryEmbedding = embedRes.data?.[0];
       if (queryEmbedding) {
-        const dynamicCount = new_message.length < 50 ? 3 : 6;
+        const dynamicCount = new_message.length < 30 ? 6 : 12;
         const chunks = await sbRpc(env, 'match_knowledge_chunks', {
           query_embedding:      queryEmbedding,
           match_role_id:        role_profile.id,
           match_manager_id:     manager_id,
           match_count:          dynamicCount,
-          similarity_threshold: 0.25
+          similarity_threshold: 0.20
         });
         if (chunks && chunks.length) {
           const formatted = chunks.map(c =>

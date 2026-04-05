@@ -316,7 +316,7 @@ async function handleRoleChat(request, env, cors) {
           knowledgeBlock = '\n\nבסיס ידע:\n' + formatted;
         }
       }
-    } catch (e) { /* אם RAG נכשל — ממשיכים בלי ידע */ }
+    } catch (e) { knowledgeBlock = '\n\n[RAG ERROR: ' + e.message + ']'; }
   }
 
   // Fetch live data for read-permitted entities

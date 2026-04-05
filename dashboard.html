@@ -2842,7 +2842,6 @@ async function sendRoleMsg(){
     var data=await r.json();
     typing.remove();
     var reply=(data.reply||data.error||'שגיאה בקבלת תשובה').trim();
-    if(data.debug)reply+='\n\n🔍 '+data.debug;
     appendRoleMsg(reply,'ai');
     _rcaHistory.push({role:'assistant',content:reply});
   }catch(e){

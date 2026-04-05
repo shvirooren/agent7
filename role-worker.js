@@ -316,11 +316,8 @@ async function handleRoleChat(request, env, cors) {
           knowledgeBlock = '\n\nבסיס ידע:\n' + formatted;
         }
       }
-    } catch (e) { knowledgeBlock = '\n\n[RAG ERROR: ' + e.message + ']'; }
+    } catch (e) { /* RAG failed silently */ }
   }
-  const ragDebug = knowledgeBlock
-    ? '[RAG: ' + (knowledgeBlock.startsWith('\n\n[RAG') ? knowledgeBlock.trim() : knowledgeBlock.split('\n').length + ' lines') + ']'
-    : '[RAG: 0 chunks for role=' + role_profile.id + ']';
 
   // Fetch live data for read-permitted entities
   let liveDataBlock = '';
@@ -469,7 +466,7 @@ async function handleRoleChat(request, env, cors) {
   }
 
   const reply = data.content.find(c => c.type === 'text')?.text || '';
-  return jsonRes({ reply, debug: ragDebug }, cors);
+  return jsonRes({ reply }, cors);
 }
 
 // ─── POST /role-action ────────────────────────────────────────

@@ -444,12 +444,14 @@ function addFiles(fileObjs) {
     if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) { toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return; }
     if (files.find(function(x) { return x.name === f.name; })) return;
     var entry = { name: f.name, size: f.size, fileObj: f, content: null, status: 'pending' };
+    entry.readPromise = new Promise(function(resolve) {
+      var reader = new FileReader();
+      reader.onload = function(e) { entry.content = e.target.result; resolve(); };
+      reader.onerror = function() { resolve(); };
+      reader.readAsText(f);
+    });
     files.push(entry);
     renderFileList(); updateCounter();
-    // קרא תוכן במקביל להצגה
-    var reader = new FileReader();
-    reader.onload = function(e) { entry.content = e.target.result; };
-    reader.readAsText(f);
   });
 }
 
@@ -490,6 +492,10 @@ async function startProcessing() {
   showStep('s-proc', null);
 
   await animateStep('ps-1', 20, 400);
+
+  // המתן לסיום קריאת כל הקבצים לפני שמתחילים
+  await Promise.all(files.map(function(f) { return f.readPromise || Promise.resolve(); }));
+
   await animateStep('ps-2', 45, 400);
 
   var indexed = 0;

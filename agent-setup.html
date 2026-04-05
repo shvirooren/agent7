@@ -529,9 +529,15 @@ async function startProcessing() {
       if (regRes.data) fileId = regRes.data.id;
     }
 
-    // 2. אינדוקס מ-content בגושים של 300k
+    // 2. אינדוקס מ-content בגושים של 20k
+    var totalBatches = Math.ceil(content.length / BATCH);
     try {
       for (var bi = 0; bi < content.length; bi += BATCH) {
+        var batchNum = Math.floor(bi / BATCH) + 1;
+        if (totalBatches > 1) {
+          document.getElementById('ps-3').querySelector('span').textContent =
+            'בונה אינדקס... ' + batchNum + '/' + totalBatches;
+        }
         var idxRes = await fetch(ROLE_WORKER_URL + '/role-index', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

@@ -572,8 +572,11 @@ async function handleRoleIndex(request, env, cors) {
 
   // 2. Delete existing chunks
   if (!append) {
-    // Always delete all chunks for this role on first batch
-    await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+    try {
+      await sbDelete(env, 'role_knowledge_chunks', { role_id, manager_id });
+    } catch(e) {
+      return jsonRes({ error: 'step2-delete: ' + e.message }, cors, 500);
+    }
   }
 
   // 3. Split into chunks
@@ -600,7 +603,12 @@ async function handleRoleIndex(request, env, cors) {
   const allEmbeddings = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
     const batch = chunks.slice(i, i + EMBED_BATCH);
-    const result = await env.AI.run('@cf/baai/bge-m3', { text: batch });
+    let result;
+    try {
+      result = await env.AI.run('@cf/baai/bge-m3', { text: batch });
+    } catch(e) {
+      return jsonRes({ error: `step5-embed batch${i}-${i+batch.length}: ${e.message}` }, cors, 500);
+    }
     allEmbeddings.push(...(result.data || []));
   }
 
@@ -612,14 +620,20 @@ async function handleRoleIndex(request, env, cors) {
     content: chunk,
     embedding: allEmbeddings[i] ? JSON.stringify(allEmbeddings[i]) : null
   }));
-  await sbInsert(env, 'role_knowledge_chunks', rows);
+  try {
+    await sbInsert(env, 'role_knowledge_chunks', rows);
+  } catch(e) {
+    return jsonRes({ error: 'step6-insert (' + rows.length + ' rows): ' + e.message }, cors, 500);
+  }
 
   // 7. Update file registry if file_id provided
   if (file_id) {
-    await sbPatch(env, 'role_knowledge_files', { id: file_id }, {
-      chunk_count: rows.length,
-      indexed_at: new Date().toISOString()
-    });
+    try {
+      await sbPatch(env, 'role_knowledge_files', { id: file_id }, {
+        chunk_count: rows.length,
+        indexed_at: new Date().toISOString()
+      });
+    } catch(e) { /* non-fatal */ }
   }
 
   return jsonRes({ indexed: rows.length, filename: filename || null }, cors);

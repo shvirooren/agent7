@@ -270,6 +270,7 @@
         <div class="ps" id="ps-3"><div class="ps-icon">🔍</div><span>בונה אינדקס חכם לחיפוש...</span></div>
         <div class="ps" id="ps-4"><div class="ps-icon">✅</div><span>הסוכן מוכן!</span></div>
       </div>
+      <div id="debug-error" style="display:none;margin-top:16px;padding:12px;background:#fee;border:1px solid #f99;border-radius:8px;font-size:13px;color:#900;word-break:break-all;direction:ltr;text-align:left"></div>
     </div>
 
     <!-- Done -->
@@ -502,7 +503,7 @@ async function startProcessing() {
   var firstIndex = true;
 
   // ── קבצים: העלאה ל-Storage (שמירה) + אינדוקס ישיר מ-content (בגושים) ──
-  var BATCH = 100000;
+  var BATCH = 20000;
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     var content = f.content;
@@ -551,7 +552,9 @@ async function startProcessing() {
       files[i].status = 'indexed';
     } catch(e) {
       files[i].status = 'error';
-      toast('שגיאה באינדוקס ' + f.name + ': ' + e.message, 'error');
+      var dbg = document.getElementById('debug-error');
+      dbg.textContent = e.message;
+      dbg.style.display = 'block';
     }
     renderFileList();
   }

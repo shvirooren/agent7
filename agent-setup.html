@@ -506,7 +506,10 @@ async function startProcessing() {
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     var content = f.content;
-    if (!content) { files[i].status = 'error'; renderFileList(); continue; }
+    if (!content) {
+      toast('לא ניתן לקרוא את הקובץ: ' + f.name, 'error');
+      files[i].status = 'error'; renderFileList(); continue;
+    }
 
     var safeFilename = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     var storagePath = CU.id + '/' + selectedRoleId + '/' + safeFilename;
@@ -541,7 +544,7 @@ async function startProcessing() {
           })
         });
         var idxData = await idxRes.json();
-        if (!idxRes.ok) throw new Error(idxData.error || 'שגיאת שרת');
+        if (!idxRes.ok) throw new Error('[' + idxRes.status + '] ' + (idxData.error || 'שגיאת שרת'));
         indexed += idxData.indexed || 0;
         firstIndex = false;
       }

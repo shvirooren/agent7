@@ -317,6 +317,7 @@ async function handleRoleChat(request, env, cors) {
         }
       }
     } catch (e) { knowledgeBlock = '\n\n[RAG ERROR: ' + e.message + ']'; }
+    if (!knowledgeBlock) knowledgeBlock = '\n\n[RAG: 0 chunks retrieved for role=' + role_profile.id + ']';
   }
 
   // Fetch live data for read-permitted entities

@@ -143,9 +143,10 @@ var SUPABASE_URL = 'https://gmjfhjnwoymmxfqdazqf.supabase.co';
 var SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
 var sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ── If already logged in, route immediately ──
+// ── If already logged in (non-anonymous), route immediately ──
 sb.auth.getSession().then(function(res) {
-  if (res.data.session) routeByRole(res.data.session.user.id);
+  var session = res.data.session;
+  if (session && !session.user.is_anonymous) routeByRole(session.user.id);
 });
 
 // ── Helpers ──

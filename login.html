@@ -208,19 +208,34 @@ function doLogin() {
       return;
     }
     var uid = res.data.user.id;
-    // detect role and show indicator before redirect
+    // detect role, show indicator, then route — all from same query result
     sb.from('user_roles').select('role').eq('user_id', uid).single().then(function(r) {
-      var role = r.data ? r.data.role : 'employee';
+      var role = r.data ? r.data.role : null;
       var pill = document.getElementById('role-pill');
       pill.style.display = 'flex';
       if (role === 'manager') {
         pill.className = 'role-pill manager';
         pill.innerHTML = '🏢 זוהית כמנהל — מעביר לדשבורד...';
-      } else {
+        setTimeout(function() { window.location.href = 'dashboard.html'; }, 900);
+      } else if (role === 'employee') {
         pill.className = 'role-pill employee';
         pill.innerHTML = '👤 זוהית כעובד — מעביר לפורטל עובדים...';
+        setTimeout(function() { window.location.href = 'employee.html'; }, 900);
+      } else {
+        // no role in user_roles — check employee_users
+        sb.from('employee_users').select('employee_id').eq('user_id', uid).single().then(function(er) {
+          pill.style.display = 'flex';
+          if (er.data && er.data.employee_id) {
+            pill.className = 'role-pill employee';
+            pill.innerHTML = '👤 זוהית כעובד — מעביר לפורטל עובדים...';
+            setTimeout(function() { window.location.href = 'employee.html'; }, 900);
+          } else {
+            pill.className = 'role-pill manager';
+            pill.innerHTML = '🏢 מעביר לדשבורד...';
+            setTimeout(function() { window.location.href = 'dashboard.html'; }, 900);
+          }
+        });
       }
-      setTimeout(function() { routeByRole(uid); }, 900);
     });
   });
 }

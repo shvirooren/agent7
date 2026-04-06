@@ -171,10 +171,10 @@ function setLoading(btnId, loading) {
 
 // ── Route by role ──
 function routeByRole(uid) {
-  sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
+  sb.from('user_roles').select('role').eq('user_id', uid).single().then(function(r) {
     if (r.error || !r.data) {
       // no role yet — check employee_users
-      sb.from('employee_users').select('employee_id').eq('auth_user_id', uid).single().then(function(er){
+      sb.from('employee_users').select('employee_id').eq('user_id', uid).single().then(function(er){
         if (er.data && er.data.employee_id) window.location.href = 'employee.html';
         else window.location.href = 'dashboard.html'; // fallback
       });
@@ -208,7 +208,7 @@ function doLogin() {
     }
     var uid = res.data.user.id;
     // detect role and show indicator before redirect
-    sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
+    sb.from('user_roles').select('role').eq('user_id', uid).single().then(function(r) {
       var role = r.data ? r.data.role : 'employee';
       var pill = document.getElementById('role-pill');
       pill.style.display = 'flex';

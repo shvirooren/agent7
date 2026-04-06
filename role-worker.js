@@ -21,6 +21,7 @@ export default {
       if (url.pathname === '/role-learn')  return await handleRoleLearn(request, env, cors);
       if (url.pathname === '/role-save')   return await handleRoleSave(request, env, cors);
       if (url.pathname === '/role-index')  return await handleRoleIndex(request, env, cors);
+      if (url.pathname === '/role-extract-pdf') return await handleExtractPdf(request, env, cors);
       if (url.pathname === '/role-action') return await handleRoleAction(request, env, cors);
       if (url.pathname === '/embed')       return await handleEmbed(request, env, cors);
       return new Response('Not Found', { status: 404, headers: cors });
@@ -548,6 +549,44 @@ async function handleEmbed(request, env, cors) {
   if (!texts || !texts.length) return jsonRes({ error: 'texts required' }, cors, 400);
   const result = await env.AI.run('@cf/baai/bge-m3', { text: texts });
   return jsonRes({ embeddings: result.data }, cors);
+}
+
+// ─── POST /role-extract-pdf — extract text from PDF via Claude ─
+async function handleExtractPdf(request, env, cors) {
+  const { pdf_base64 } = await request.json();
+  if (!pdf_base64) return jsonRes({ error: 'pdf_base64 required' }, cors, 400);
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01',
+      'anthropic-beta': 'pdfs-2024-09-25'
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 8192,
+      messages: [{
+        role: 'user',
+        content: [
+          {
+            type: 'document',
+            source: { type: 'base64', media_type: 'application/pdf', data: pdf_base64 }
+          },
+          {
+            type: 'text',
+            text: 'Extract all text from this document. Return only the raw text content, preserving structure (headings, paragraphs, tables as text). No explanations.'
+          }
+        ]
+      }]
+    })
+  });
+
+  const data = await res.json();
+  if (!res.ok) return jsonRes({ error: data.error?.message || 'Claude PDF error' }, cors, 500);
+  const text = data.content?.[0]?.text || '';
+  return jsonRes({ text }, cors);
 }
 
 // ─── POST /role-index — chunk + embed knowledge base ─────────

@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>הקם סוכן AI — Agent 7</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
@@ -443,7 +442,6 @@
 <div class="toast" id="toast"></div>
 
 <script>
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 var SURL = 'https://gmjfhjnwoymmxfqdazqf.supabase.co';
 var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
@@ -615,17 +613,20 @@ async function goStep2() {
 async function extractText(file) {
   if (/\.pdf$/i.test(file.name)) {
     try {
-      if (!window.pdfjsLib) throw new Error('PDF.js לא נטען — נסה לרענן את הדף');
       var ab = await file.arrayBuffer();
-      var pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
-      var text = '';
-      for (var i = 1; i <= pdf.numPages; i++) {
-        var page = await pdf.getPage(i);
-        var ct = await page.getTextContent();
-        text += ct.items.map(function(it) { return it.str; }).join(' ') + '\n';
-      }
-      if (!text.trim()) throw new Error('ה-PDF לא מכיל טקסט שניתן לחלץ (ייתכן שהוא סרוק/תמונה)');
-      return text;
+      var bytes = new Uint8Array(ab);
+      var binary = '';
+      for (var i = 0; i < bytes.byteLength; i++) binary += String.fromCharCode(bytes[i]);
+      var b64 = btoa(binary);
+      var res = await fetch(ROLE_WORKER_URL + '/role-extract-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pdf_base64: b64 })
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'שגיאת שרת');
+      if (!data.text || !data.text.trim()) throw new Error('לא נמצא טקסט בקובץ');
+      return data.text;
     } catch(e) {
       toast('שגיאת PDF: ' + e.message, 'error');
       return null;

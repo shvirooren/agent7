@@ -237,14 +237,16 @@ async function send() {
   hideSuggestions();
 
   appendMsg(text, 'user');
-  history.push({ role: 'user', content: text });
 
   var typing = appendMsg('חושב...', 'ai typing');
   document.getElementById('send-btn').disabled = true;
 
   try {
+    var ctrl = new AbortController();
+    var timeout = setTimeout(function() { ctrl.abort(); }, 30000);
     var r = await fetch(ROLE_WORKER_URL + '/role-chat', {
       method: 'POST',
+      signal: ctrl.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         role_profile: {
@@ -262,14 +264,20 @@ async function send() {
         manager_id:           CU.id
       })
     });
+    clearTimeout(timeout);
     var data = await r.json();
     typing.remove();
     var reply = (data.reply || data.error || 'שגיאה').trim();
     appendMsg(reply, 'ai');
+    history.push({ role: 'user', content: text });
     history.push({ role: 'assistant', content: reply });
   } catch(e) {
     typing.remove();
-    appendMsg('שגיאת חיבור: ' + e.message, 'ai');
+    if (e.name === 'AbortError') {
+      appendMsg('פג תוקף — הסוכן לא ענה בזמן. נסה שוב.', 'ai');
+    } else {
+      appendMsg('שגיאת חיבור: ' + e.message, 'ai');
+    }
   }
 
   document.getElementById('send-btn').disabled = false;

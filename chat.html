@@ -168,27 +168,39 @@ var sb = supabase.createClient(SURL, SKEY);
 var CU = null, role = null, history = [];
 
 (async function init() {
-  var { data: { session } } = await sb.auth.getSession();
-  if (!session) { window.location.href = 'start.html'; return; }
-  CU = session.user;
+  try {
+    var { data: { session } } = await sb.auth.getSession();
+    if (!session) { window.location.href = 'start.html'; return; }
+    CU = session.user;
 
-  var roleId = sessionStorage.getItem('autoOpenRole');
-  if (!roleId) { window.location.href = 'agent-setup.html'; return; }
+    var roleId = sessionStorage.getItem('autoOpenRole');
+    if (!roleId) { showLoadErr('לא נמצא סוכן — חזור להקמה'); return; }
 
-  var { data } = await sb.from('job_roles').select('*').eq('id', roleId).single();
-  if (!data) { window.location.href = 'agent-setup.html'; return; }
-  role = data;
+    var { data, error } = await sb.from('job_roles').select('*').eq('id', roleId).single();
+    if (error || !data) { showLoadErr('שגיאה בטעינת הסוכן: ' + (error?.message || 'לא נמצא')); return; }
+    role = data;
 
-  document.getElementById('agent-name').textContent = role.title || 'סוכן AI';
-  document.getElementById('agent-sub').textContent  = role.description || 'מוכן לשאלות';
-  document.getElementById('loading').style.display = 'none';
-  document.getElementById('hdr').style.display = 'flex';
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('inp').focus();
-
-  // הצג שאלות מוצעות אם יש תיאור
-  showSuggestions();
+    document.getElementById('agent-name').textContent = role.title || 'סוכן AI';
+    document.getElementById('agent-sub').textContent  = role.description || 'מוכן לשאלות';
+    document.getElementById('loading').style.display = 'none';
+    document.getElementById('hdr').style.display = 'flex';
+    document.getElementById('send-btn').disabled = false;
+    document.getElementById('inp').focus();
+    showSuggestions();
+  } catch(e) {
+    showLoadErr('שגיאה: ' + e.message);
+  }
 })();
+
+function showLoadErr(msg) {
+  document.querySelector('.loading-msg').textContent = msg;
+  document.querySelector('.spinner').style.display = 'none';
+  var btn = document.createElement('button');
+  btn.textContent = '← חזור להקמה';
+  btn.style.cssText = 'margin-top:16px;padding:10px 20px;border-radius:10px;background:#0055A4;color:#fff;border:none;cursor:pointer;font-size:14px;font-family:inherit';
+  btn.onclick = function() { window.location.href = 'agent-setup.html'; };
+  document.getElementById('loading').appendChild(btn);
+}
 
 function showSuggestions() {
   var sugs = document.getElementById('suggestions');

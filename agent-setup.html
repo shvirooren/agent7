@@ -3,173 +3,302 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>הגדר סוכן — Agent 7</title>
+  <title>הקם סוכן AI — Agent 7</title>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
-      --bd: #003366; --bm: #0055A4; --ba: #009FE3;
-      --gr: #28a745; --or: #fd7e14; --rd: #dc3545;
-      --gl: #F5F7FA; --gm: #E2E8F0; --gt: #94A3B8; --td: #2D3748;
+      --bd: #003366; --bm: #0055A4; --ba: #009FE3; --ac: #00c8ff;
+      --gr: #22c55e; --or: #fd7e14; --rd: #ef4444;
+      --gl: #F5F7FA; --gm: #E2E8F0; --gt: #94A3B8; --td: #1e293b;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-      background: var(--gl); color: var(--td);
-      direction: rtl; min-height: 100vh; display: flex; flex-direction: column;
+      direction: rtl; min-height: 100vh;
+      background: linear-gradient(135deg, #0a0f2e 0%, #0d3572 50%, #0a1a4a 100%);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 0 16px 60px;
     }
-    .hdr {
-      background: var(--bd); color: #fff;
-      padding: 14px 24px; display: flex; align-items: center; gap: 12px;
+    body::before {
+      content: '';
+      position: fixed; inset: 0; pointer-events: none;
+      background:
+        radial-gradient(ellipse 600px 400px at 20% 20%, rgba(0,200,255,.08) 0%, transparent 70%),
+        radial-gradient(ellipse 400px 300px at 80% 70%, rgba(0,85,164,.15) 0%, transparent 70%);
     }
-    .logo { font-size: 20px; font-weight: 800; color: var(--ba); }
-    .hdr-sub { font-size: 14px; opacity: .7; }
-    .main {
-      flex: 1; display: flex; align-items: flex-start;
-      justify-content: center; padding: 40px 16px;
+
+    .topbar {
+      width: 100%; max-width: 700px;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 24px 0 32px;
     }
-    .card {
-      background: #fff; border-radius: 16px;
-      box-shadow: 0 4px 24px rgba(0,0,0,.08);
-      width: 100%; max-width: 640px; overflow: hidden;
-    }
-    .steps {
-      display: flex; background: var(--gl);
-      border-bottom: 1px solid var(--gm); padding: 14px 24px;
-    }
-    .si { flex: 1; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--gt); }
-    .si.active { color: var(--bm); font-weight: 700; }
-    .si.done  { color: var(--gr); }
-    .si-num {
-      width: 24px; height: 24px; border-radius: 50%;
+    .logo { display: flex; align-items: center; gap: 10px; }
+    .logo-badge {
+      width: 36px; height: 36px; border-radius: 10px;
+      background: linear-gradient(135deg, var(--bm), var(--ac));
       display: flex; align-items: center; justify-content: center;
-      font-size: 12px; font-weight: 700;
-      background: var(--gm); color: var(--gt); flex-shrink: 0;
+      font-size: 18px; font-weight: 900; color: #fff;
     }
-    .si.active .si-num { background: var(--bm); color: #fff; }
-    .si.done  .si-num  { background: var(--gr); color: #fff; }
-    .sc { padding: 28px 24px; }
-    .sc-title { font-size: 20px; font-weight: 800; color: var(--bd); margin-bottom: 6px; }
-    .sc-sub   { font-size: 14px; color: var(--gt); margin-bottom: 22px; line-height: 1.6; }
-    .toggle { display: flex; gap: 8px; margin-bottom: 20px; }
+    .logo-text { font-size: 18px; font-weight: 800; color: #fff; }
+    .logo-text span { color: var(--ac); }
+    .back-btn {
+      color: rgba(255,255,255,.5); font-size: 13px; cursor: pointer;
+      background: none; border: none; font-family: inherit; transition: color .2s;
+    }
+    .back-btn:hover { color: #fff; }
+
+    .hero { text-align: center; margin-bottom: 36px; }
+    .hero-tag {
+      display: inline-block; background: rgba(0,200,255,.12);
+      border: 1px solid rgba(0,200,255,.3); color: var(--ac);
+      font-size: 12px; font-weight: 700; padding: 5px 14px;
+      border-radius: 100px; margin-bottom: 16px;
+    }
+    .hero-title {
+      font-size: clamp(28px, 5vw, 42px); font-weight: 900; color: #fff;
+      line-height: 1.15; margin-bottom: 12px;
+    }
+    .hero-title span {
+      background: linear-gradient(90deg, var(--ac), #7dd3fc);
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+    }
+    .hero-sub { font-size: 15px; color: rgba(255,255,255,.55); line-height: 1.6; }
+
+    .steps-bar {
+      width: 100%; max-width: 500px;
+      display: flex; align-items: center; margin-bottom: 32px;
+    }
+    .step-item {
+      display: flex; align-items: center; gap: 8px;
+      font-size: 13px; font-weight: 600; color: rgba(255,255,255,.3); transition: color .3s;
+    }
+    .step-item.active { color: #fff; }
+    .step-item.done   { color: var(--ac); }
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 800;
+      background: rgba(255,255,255,.08); border: 1.5px solid rgba(255,255,255,.15);
+      transition: all .3s; flex-shrink: 0;
+    }
+    .step-item.active .step-num { background: var(--bm); border-color: var(--ac); color: #fff; box-shadow: 0 0 16px rgba(0,200,255,.4); }
+    .step-item.done  .step-num  { background: var(--ac); border-color: var(--ac); color: #fff; }
+    .step-line { flex: 1; height: 1px; background: rgba(255,255,255,.1); margin: 0 10px; transition: background .3s; }
+    .step-line.done { background: var(--ac); }
+
+    .card {
+      width: 100%; max-width: 680px;
+      background: rgba(255,255,255,.97);
+      border-radius: 24px;
+      box-shadow: 0 32px 80px rgba(0,0,0,.4), 0 0 0 1px rgba(255,255,255,.1);
+      overflow: hidden; animation: cardIn .4s ease;
+    }
+    @keyframes cardIn { from { opacity:0; transform:translateY(20px); } to { opacity:1; transform:translateY(0); } }
+
+    .card-head {
+      background: linear-gradient(135deg, var(--bd) 0%, var(--bm) 100%);
+      padding: 24px 28px;
+    }
+    .card-head-title { font-size: 18px; font-weight: 800; color: #fff; margin-bottom: 4px; }
+    .card-head-sub   { font-size: 13px; color: rgba(255,255,255,.6); }
+    .card-body { padding: 28px; }
+
+    .toggle { display: flex; gap: 6px; margin-bottom: 24px; background: var(--gl); padding: 4px; border-radius: 10px; }
     .tb {
-      flex: 1; padding: 10px; border: 1.5px solid var(--gm); border-radius: 8px;
-      background: #fff; cursor: pointer; font-size: 13px; font-weight: 600;
-      color: var(--gt); text-align: center; transition: all .2s; font-family: inherit;
+      flex: 1; padding: 9px; border-radius: 8px;
+      background: transparent; cursor: pointer; font-size: 13px; font-weight: 600;
+      color: var(--gt); border: none; font-family: inherit; transition: all .2s;
     }
-    .tb.active { border-color: var(--bm); background: #EBF5FF; color: var(--bm); }
-    .field { margin-bottom: 16px; }
-    .lbl { display: block; font-size: 13px; font-weight: 600; margin-bottom: 6px; }
-    .hint { font-size: 11px; color: var(--gt); margin-top: 4px; }
+    .tb.active { background: #fff; color: var(--bm); box-shadow: 0 2px 8px rgba(0,0,0,.08); }
+
+    .field { margin-bottom: 18px; }
+    .lbl { display: block; font-size: 13px; font-weight: 700; color: var(--td); margin-bottom: 6px; }
+    .hint { font-size: 11px; color: var(--gt); margin-top: 5px; line-height: 1.5; }
     .inp, .ta, .sel {
-      width: 100%; padding: 10px 12px; border: 1.5px solid var(--gm);
-      border-radius: 8px; font-size: 14px; font-family: inherit;
-      direction: rtl; color: var(--td); background: #fff; transition: border-color .2s;
+      width: 100%; padding: 11px 14px;
+      border: 1.5px solid var(--gm); border-radius: 10px;
+      font-size: 14px; font-family: inherit; direction: rtl;
+      color: var(--td); background: #fff; transition: all .2s;
     }
-    .inp:focus, .ta:focus, .sel:focus { outline: none; border-color: var(--ba); }
+    .inp:focus, .ta:focus, .sel:focus { outline: none; border-color: var(--ba); box-shadow: 0 0 0 3px rgba(0,159,227,.12); }
     .ta { resize: vertical; min-height: 80px; }
+
     .section-title {
-      font-size: 13px; font-weight: 700; color: var(--bd);
-      margin: 20px 0 12px; padding-bottom: 8px;
-      border-bottom: 1px solid var(--gm);
+      font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+      color: var(--gt); margin: 24px 0 14px;
+      display: flex; align-items: center; gap: 8px;
     }
+    .section-title::after { content: ''; flex: 1; height: 1px; background: var(--gm); }
+
     /* Permissions */
-    .perm-table { width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 6px; }
-    .perm-table th { text-align: right; padding: 8px 10px; background: var(--gl); font-weight: 700; }
+    .perm-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .perm-table th { text-align: right; padding: 8px 12px; background: var(--gl); font-weight: 700; font-size: 12px; color: var(--gt); }
     .perm-table th:not(:first-child) { text-align: center; }
-    .perm-table td { padding: 8px 10px; border-bottom: 1px solid var(--gm); }
+    .perm-table td { padding: 10px 12px; border-bottom: 1px solid var(--gl); }
     .perm-table td:not(:first-child) { text-align: center; }
+    .perm-table tr:last-child td { border-bottom: none; }
+    .perm-table input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--bm); }
+
     /* Drop zone */
     .dz {
-      border: 2px dashed var(--gm); border-radius: 12px;
-      padding: 28px 24px; text-align: center;
-      cursor: pointer; transition: all .2s; margin-bottom: 12px;
+      border: 2px dashed var(--gm); border-radius: 14px;
+      padding: 32px 24px; text-align: center;
+      cursor: pointer; transition: all .25s; margin-bottom: 12px; background: #fafbff;
     }
-    .dz:hover, .dz.over { border-color: var(--ba); background: #F0F9FF; }
-    .dz-icon  { font-size: 36px; margin-bottom: 8px; }
-    .dz-title { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+    .dz:hover, .dz.over { border-color: var(--ba); background: #EBF5FF; box-shadow: 0 0 0 4px rgba(0,159,227,.08); }
+    .dz-icon  { font-size: 40px; margin-bottom: 10px; }
+    .dz-title { font-size: 15px; font-weight: 700; color: var(--td); margin-bottom: 5px; }
     .dz-sub   { font-size: 12px; color: var(--gt); }
+    .dz-sub span { color: var(--bm); font-weight: 600; }
+    .dz-formats { display: flex; gap: 6px; justify-content: center; flex-wrap: wrap; margin-top: 10px; }
+    .fmt-badge {
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+      background: var(--gl); color: var(--gt); border: 1px solid var(--gm);
+    }
+
     .fl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
     .fi {
       display: flex; align-items: center; gap: 8px;
-      padding: 8px 12px; background: var(--gl); border-radius: 8px; font-size: 13px;
+      padding: 9px 12px; background: var(--gl); border-radius: 8px; font-size: 13px;
     }
-    .fn { flex: 1; font-weight: 500; }
-    .fs { color: var(--gt); font-size: 12px; }
-    .frm { cursor: pointer; color: var(--rd); font-size: 18px; background: none; border: none; line-height: 1; }
-    .cc { font-size: 12px; color: var(--gt); text-align: left; margin-top: 4px; }
-    .cc.warn { color: var(--or); }
-    .or {
-      display: flex; align-items: center; gap: 12px;
-      margin: 12px 0; color: var(--gt); font-size: 12px;
-    }
+    .fn { flex: 1; font-weight: 500; color: var(--td); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .fs { color: var(--gt); font-size: 12px; flex-shrink: 0; }
+    .frm { cursor: pointer; color: var(--gt); font-size: 18px; background: none; border: none; line-height: 1; flex-shrink: 0; transition: color .2s; }
+    .frm:hover { color: var(--rd); }
+    .cc { font-size: 12px; color: var(--gt); margin-top: 4px; }
+
+    .or { display: flex; align-items: center; gap: 12px; margin: 16px 0; color: var(--gt); font-size: 12px; font-weight: 600; }
     .or::before, .or::after { content: ''; flex: 1; height: 1px; background: var(--gm); }
+
+    /* Existing files list */
+    .existing-files { margin-top: 16px; }
+    .ef-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 14px; border-radius: 10px;
+      border: 1.5px solid var(--gm); margin-bottom: 8px;
+      background: #fff; transition: border-color .2s;
+    }
+    .ef-item:hover { border-color: var(--gm); }
+    .ef-icon { font-size: 20px; flex-shrink: 0; }
+    .ef-info { flex: 1; min-width: 0; }
+    .ef-name { font-size: 13px; font-weight: 600; color: var(--td); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ef-meta { font-size: 11px; color: var(--gt); margin-top: 2px; }
+    .ef-del {
+      background: none; border: none; cursor: pointer; color: var(--gt);
+      font-size: 16px; padding: 4px; border-radius: 6px; transition: all .2s; flex-shrink: 0;
+    }
+    .ef-del:hover { background: #fee; color: var(--rd); }
+    .ef-empty { text-align: center; color: var(--gt); font-size: 13px; padding: 16px; }
+
+    /* Buttons */
     .btn {
-      padding: 12px 24px; border-radius: 8px; font-size: 14px;
-      font-weight: 700; cursor: pointer; border: none;
-      font-family: inherit; transition: all .2s; width: 100%;
+      width: 100%; padding: 13px 24px; border-radius: 12px;
+      font-size: 15px; font-weight: 700; cursor: pointer; border: none;
+      font-family: inherit; transition: all .2s; margin-top: 8px;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
     }
-    .btn-p { background: var(--bm); color: #fff; margin-top: 8px; }
-    .btn-p:hover:not(:disabled) { background: var(--bd); }
-    .btn-p:disabled { opacity: .5; cursor: not-allowed; }
-    .btn-s {
-      background: var(--gl); color: var(--td);
-      border: 1.5px solid var(--gm); margin-top: 8px;
-    }
+    .btn-p { background: linear-gradient(135deg, var(--bm) 0%, #007acc 100%); color: #fff; box-shadow: 0 4px 16px rgba(0,85,164,.35); }
+    .btn-p:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,85,164,.45); }
+    .btn-p:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+    .btn-s { background: var(--gl); color: var(--td); border: 1.5px solid var(--gm); }
     .btn-s:hover { background: var(--gm); }
-    .prog-bar { height: 6px; background: var(--gm); border-radius: 3px; overflow: hidden; margin: 20px 0; }
-    .prog-fill { height: 100%; background: var(--ba); border-radius: 3px; transition: width .5s ease; }
-    .ps-list { display: flex; flex-direction: column; gap: 12px; margin: 20px 0; }
+
+    /* Processing */
+    .proc-wrap { padding: 36px 28px; }
+    .proc-title { font-size: 22px; font-weight: 900; color: var(--td); margin-bottom: 6px; text-align: center; }
+    .proc-sub   { font-size: 14px; color: var(--gt); text-align: center; margin-bottom: 28px; }
+    .prog-bar { height: 8px; background: var(--gl); border-radius: 100px; overflow: hidden; margin-bottom: 28px; }
+    .prog-fill { height: 100%; background: linear-gradient(90deg, var(--bm), var(--ac)); border-radius: 100px; transition: width .6s ease; box-shadow: 0 0 12px rgba(0,200,255,.5); }
+    .ps-list { display: flex; flex-direction: column; gap: 10px; }
     .ps {
-      display: flex; align-items: center; gap: 12px;
-      padding: 12px 16px; border-radius: 10px;
-      background: var(--gl); font-size: 14px; color: var(--gt); transition: all .3s;
+      display: flex; align-items: center; gap: 14px;
+      padding: 14px 18px; border-radius: 12px;
+      background: var(--gl); font-size: 14px; color: var(--gt);
+      transition: all .35s; border: 1.5px solid transparent;
     }
-    .ps.active { background: #EBF5FF; color: var(--bm); font-weight: 600; }
-    .ps.done   { background: #F0FFF4; color: var(--gr); }
-    .ps-icon   { font-size: 22px; width: 30px; text-align: center; flex-shrink: 0; }
-    .done-icon  { font-size: 64px; text-align: center; margin-bottom: 16px; }
-    .done-title { font-size: 22px; font-weight: 800; color: var(--bd); text-align: center; margin-bottom: 6px; }
-    .done-sub   { font-size: 14px; color: var(--gt); text-align: center; margin-bottom: 24px; }
-    .stats { display: flex; gap: 12px; margin-bottom: 24px; }
-    .stat { flex: 1; background: var(--gl); border-radius: 10px; padding: 16px; text-align: center; }
-    .stat-n { font-size: 30px; font-weight: 800; color: var(--bm); }
-    .stat-l { font-size: 12px; color: var(--gt); margin-top: 2px; }
+    .ps.active { background: #EBF5FF; color: var(--bm); font-weight: 600; border-color: rgba(0,159,227,.2); box-shadow: 0 2px 12px rgba(0,85,164,.08); }
+    .ps.done   { background: #f0fdf4; color: #16a34a; border-color: rgba(34,197,94,.2); }
+    .ps-icon   { font-size: 22px; width: 32px; text-align: center; flex-shrink: 0; }
+
+    /* Done */
+    .done-wrap { padding: 48px 28px 36px; text-align: center; }
+    .done-glow {
+      width: 96px; height: 96px; border-radius: 50%;
+      background: linear-gradient(135deg, var(--bm), var(--ac));
+      display: flex; align-items: center; justify-content: center;
+      font-size: 44px; margin: 0 auto 24px;
+      box-shadow: 0 0 40px rgba(0,200,255,.3), 0 8px 32px rgba(0,85,164,.4);
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%,100% { box-shadow: 0 0 40px rgba(0,200,255,.3), 0 8px 32px rgba(0,85,164,.4); }
+      50%      { box-shadow: 0 0 60px rgba(0,200,255,.5), 0 8px 40px rgba(0,85,164,.5); }
+    }
+    .done-title { font-size: 28px; font-weight: 900; color: var(--td); margin-bottom: 8px; }
+    .done-sub   { font-size: 15px; color: var(--gt); margin-bottom: 32px; line-height: 1.6; }
+    .stats { display: flex; gap: 12px; margin-bottom: 28px; }
+    .stat { flex: 1; border-radius: 14px; padding: 18px 12px; text-align: center; background: linear-gradient(135deg, var(--bd) 0%, var(--bm) 100%); }
+    .stat-n { font-size: 32px; font-weight: 900; color: #fff; }
+    .stat-l { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 3px; font-weight: 600; }
+
     .toast {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: var(--td); color: #fff; padding: 10px 20px;
-      border-radius: 8px; font-size: 13px; z-index: 9999;
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--td); color: #fff; padding: 12px 22px;
+      border-radius: 12px; font-size: 14px; z-index: 9999;
       opacity: 0; transition: opacity .3s; pointer-events: none;
+      box-shadow: 0 8px 24px rgba(0,0,0,.3); white-space: nowrap;
     }
     .toast.show { opacity: 1; }
     .toast.error   { background: var(--rd); }
     .toast.success { background: var(--gr); }
     [hidden] { display: none !important; }
+
+    @media (max-width: 600px) {
+      .hero-title { font-size: 26px; }
+      .card-body, .proc-wrap, .done-wrap { padding: 20px; }
+      .stats { flex-direction: column; gap: 8px; }
+    }
   </style>
 </head>
 <body>
 
-<div class="hdr">
-  <div class="logo">Agent 7</div>
-  <div class="hdr-sub">הגדר סוכן AI לעסק שלך</div>
+<div class="topbar">
+  <div class="logo">
+    <div class="logo-badge">7</div>
+    <div class="logo-text">Agent <span>7</span></div>
+  </div>
+  <button class="back-btn" onclick="window.location.href='dashboard.html'">← חזור לדשבורד</button>
 </div>
 
-<div class="main">
-  <div class="card">
+<div class="hero">
+  <div class="hero-tag">⚡ הקמה בפחות מדקה</div>
+  <div class="hero-title">בנה סוכן AI<br><span>שמכיר את העסק שלך</span></div>
+  <div class="hero-sub">העלה את הידע שלך — הסוכן לומד, מבין, ועונה</div>
+</div>
 
-    <div class="steps">
-      <div class="si active" id="si-1"><div class="si-num">1</div><span>הגדר סוכן</span></div>
-      <div class="si"        id="si-2"><div class="si-num">2</div><span>ידע והרשאות</span></div>
-      <div class="si"        id="si-3"><div class="si-num">3</div><span>מוכן!</span></div>
+<div class="steps-bar">
+  <div class="step-item active" id="si-1"><div class="step-num" id="sn-1">1</div><span>הגדר סוכן</span></div>
+  <div class="step-line" id="sl-1"></div>
+  <div class="step-item" id="si-2"><div class="step-num" id="sn-2">2</div><span>ידע והרשאות</span></div>
+  <div class="step-line" id="sl-2"></div>
+  <div class="step-item" id="si-3"><div class="step-num" id="sn-3">3</div><span>מוכן!</span></div>
+</div>
+
+<div class="card">
+
+  <!-- Step 1 -->
+  <div id="s1">
+    <div class="card-head">
+      <div class="card-head-title">הגדר את הסוכן שלך</div>
+      <div class="card-head-sub">צור חדש או שדרג סוכן קיים</div>
     </div>
-
-    <!-- Step 1: Define agent -->
-    <div class="sc" id="s1">
-      <div class="sc-title">הגדר את הסוכן</div>
-      <div class="sc-sub">צור סוכן חדש או שדרג סוכן קיים</div>
-
+    <div class="card-body">
       <div class="toggle">
-        <button class="tb active" id="tb-new"      onclick="setMode('new')">✨ צור סוכן חדש</button>
-        <button class="tb"        id="tb-existing" onclick="setMode('existing')">📂 שדרג קיים</button>
+        <button class="tb active" id="tb-new" onclick="setMode('new')">✨ סוכן חדש</button>
+        <button class="tb" id="tb-existing" onclick="setMode('existing')">📂 שדרג קיים</button>
       </div>
 
       <div id="mode-new">
@@ -206,22 +335,27 @@
         </div>
       </div>
 
-      <div class="section-title">הוראות לסוכן (System Prompt)</div>
+      <div class="section-title">הוראות לסוכן</div>
       <div class="field">
         <textarea class="ta" id="agent-sysp" rows="4"
           placeholder="אתה סוכן AI מקצועי. הטון שלך ידידותי ומקצועי. תמיד ענה בעברית. כשלקוח שואל על מחיר, הפנה אותו למנהל..."></textarea>
-        <div class="hint">הוראות אלו עוצבות את אופי הסוכן — טון, גבולות, התנהגות</div>
+        <div class="hint">הוראות אלו מעצבות את אופי הסוכן — טון, גבולות, התנהגות</div>
       </div>
 
-      <button class="btn btn-p" onclick="goStep2()">המשך ←</button>
+      <button class="btn btn-p" onclick="goStep2()">המשך לשלב הבא ←</button>
     </div>
+  </div>
 
-    <!-- Step 2: Knowledge + Permissions -->
-    <div class="sc" id="s2" hidden>
-      <div class="sc-title">ידע והרשאות</div>
-      <div class="sc-sub">הכנס מידע עסקי והגדר לאיזה נתונים הסוכן יוכל לגשת</div>
+  <!-- Step 2 -->
+  <div id="s2" hidden>
+    <div class="card-head">
+      <div class="card-head-title">ידע והרשאות</div>
+      <div class="card-head-sub">הכנס מידע עסקי והגדר מה הסוכן יכול לגשת אליו</div>
+    </div>
+    <div class="card-body">
 
-      <div class="section-title">בסיס ידע</div>
+      <div class="section-title">העלאת קבצים</div>
+
       <div class="dz" id="dropzone"
            onclick="document.getElementById('file-input').click()"
            ondragover="onDragOver(event)"
@@ -229,79 +363,93 @@
            ondrop="onDrop(event)">
         <div class="dz-icon">📂</div>
         <div class="dz-title">גרור קבצים לכאן</div>
-        <div class="dz-sub">.txt · .csv · .md · .eml · .log — עד 10 קבצים</div>
+        <div class="dz-sub">או <span>לחץ לבחירה</span></div>
+        <div class="dz-formats">
+          <span class="fmt-badge">TXT</span>
+          <span class="fmt-badge">PDF</span>
+          <span class="fmt-badge">Excel</span>
+          <span class="fmt-badge">CSV</span>
+          <span class="fmt-badge">MD</span>
+          <span class="fmt-badge">EML</span>
+        </div>
       </div>
-      <input type="file" id="file-input" multiple accept=".txt,.csv,.md,.eml,.log" hidden onchange="onFileSelect(event)">
+      <input type="file" id="file-input" multiple accept=".txt,.csv,.md,.eml,.log,.pdf,.xlsx,.xls" hidden onchange="onFileSelect(event)">
       <div class="fl" id="file-list"></div>
+      <div class="cc" id="char-counter"></div>
+
+      <!-- Existing files in knowledge base -->
+      <div class="section-title">קבצים קיימים בבסיס הידע</div>
+      <div id="existing-files-list">
+        <div class="ef-empty" style="color:var(--gt);font-size:13px;padding:12px 0">טוען...</div>
+      </div>
 
       <div class="or">או הדבק טקסט ישירות</div>
       <div class="field">
-        <textarea class="ta" id="paste-area" rows="5"
+        <textarea class="ta" id="paste-area" rows="4"
           placeholder="הדבק כאן מיילים, טקסט, נהלים, מחירונים, שיחות..."
           oninput="updateCounter()"></textarea>
-        <div class="cc" id="char-counter">0 תווים</div>
       </div>
 
-      <div class="section-title">הרשאות גישה לנתוני המערכת</div>
+      <div class="section-title">הרשאות גישה לנתונים</div>
       <table class="perm-table">
         <thead>
           <tr>
-            <th>ישות</th>
-            <th>קריאה</th>
-            <th>כתיבה</th>
+            <th>ישות</th><th>קריאה</th><th>כתיבה</th>
           </tr>
         </thead>
         <tbody id="perm-tbody"></tbody>
       </table>
-      <div class="hint" style="margin-bottom:16px">הסוכן יראה ויפעל רק על נתונים שהרשית לו. כתיבה כוללת קריאה אוטומטית.</div>
+      <div class="hint" style="margin:10px 0 20px">הסוכן יראה ויפעל רק על נתונים שהרשית לו</div>
 
       <button class="btn btn-p" id="process-btn" onclick="startProcessing()">🚀 אמן את הסוכן</button>
       <button class="btn btn-s" onclick="showStep('s1',1)">← חזור</button>
     </div>
+  </div>
 
-    <!-- Processing -->
-    <div class="sc" id="s-proc" hidden>
-      <div class="sc-title">מאמן את הסוכן...</div>
-      <div class="sc-sub">זה לוקח כמה שניות — שווה להמתין 😊</div>
+  <!-- Processing -->
+  <div id="s-proc" hidden>
+    <div class="proc-wrap">
+      <div class="proc-title">מאמן את הסוכן...</div>
+      <div class="proc-sub">הסוכן לומד את המידע שלך — שווה להמתין 😊</div>
       <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
       <div class="ps-list">
         <div class="ps" id="ps-1"><div class="ps-icon">💾</div><span>שומר הגדרות...</span></div>
         <div class="ps" id="ps-2"><div class="ps-icon">📄</div><span>קורא מסמכים ומנקה טקסט...</span></div>
-        <div class="ps" id="ps-3"><div class="ps-icon">🔍</div><span>בונה אינדקס חכם לחיפוש...</span></div>
+        <div class="ps" id="ps-3"><div class="ps-icon">🧠</div><span>בונה אינדקס חכם לחיפוש...</span></div>
         <div class="ps" id="ps-4"><div class="ps-icon">✅</div><span>הסוכן מוכן!</span></div>
       </div>
-      <div id="debug-error" style="display:none;margin-top:16px;padding:12px;background:#fee;border:1px solid #f99;border-radius:8px;font-size:13px;color:#900;word-break:break-all;direction:ltr;text-align:left"></div>
+      <div id="debug-error" style="display:none;margin-top:16px;padding:12px;background:#fee;border:1px solid #f99;border-radius:10px;font-size:13px;color:#900;word-break:break-all;direction:ltr;text-align:left"></div>
     </div>
+  </div>
 
-    <!-- Done -->
-    <div class="sc" id="s-done" hidden>
-      <div class="done-icon">🎉</div>
+  <!-- Done -->
+  <div id="s-done" hidden>
+    <div class="done-wrap">
+      <div class="done-glow">🎉</div>
       <div class="done-title">הסוכן מוכן!</div>
       <div class="done-sub" id="done-sub">הסוכן שלך למד את המידע ומוכן לענות על שאלות</div>
       <div class="stats">
         <div class="stat"><div class="stat-n" id="st-chunks">0</div><div class="stat-l">קטעי ידע</div></div>
-        <div class="stat"><div class="stat-n" id="st-files">0</div><div class="stat-l">מקורות</div></div>
+        <div class="stat"><div class="stat-n" id="st-files">0</div><div class="stat-l">מקורות מידע</div></div>
         <div class="stat"><div class="stat-n" id="st-chars">0</div><div class="stat-l">קבצים הועלו</div></div>
       </div>
-      <button class="btn btn-p" onclick="goDashboard()">💬 דבר עם הסוכן ←</button>
+      <button class="btn btn-p" onclick="goDashboard()" style="font-size:16px;padding:16px">💬 דבר עם הסוכן ←</button>
       <button class="btn btn-s" onclick="goAgain()">➕ הוסף עוד מידע</button>
     </div>
-
   </div>
+
 </div>
 
 <div class="toast" id="toast"></div>
 
 <script>
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 var SURL = 'https://gmjfhjnwoymmxfqdazqf.supabase.co';
 var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
 var ROLE_WORKER_URL = 'https://agent7-rules.shvirooren.workers.dev';
-
 var sb = supabase.createClient(SURL, SKEY);
-var CU = null;
-var mode = 'new';
-var selectedRoleId = null;
-var files = [];
+var CU = null, mode = 'new', selectedRoleId = null, files = [];
 
 var PERM_ENTITIES = [
   {key:'shipments', label:'משלוחים'},
@@ -323,7 +471,7 @@ var PERM_ENTITIES = [
     sessionStorage.removeItem('editRole');
     setMode('existing');
     document.getElementById('existing-role').value = editRoleId;
-    loadExistingRoleData();
+    await loadExistingRoleData();
   }
 })();
 
@@ -332,26 +480,18 @@ function renderPermTable(perms) {
   var h = '';
   PERM_ENTITIES.forEach(function(e) {
     var r = perms[e.key] || {};
-    h += '<tr>';
-    h += '<td style="font-weight:600">' + e.label + '</td>';
+    h += '<tr><td style="font-weight:600;color:var(--td)">' + e.label + '</td>';
     h += '<td><input type="checkbox" id="perm-' + e.key + '-read"' + (r.read||r.write?' checked':'') + ' onchange="onPermChange(\'' + e.key + '\',\'read\')"></td>';
-    h += '<td>' + (e.noWrite ? '—' : '<input type="checkbox" id="perm-' + e.key + '-write"' + (r.write?' checked':'') + ' onchange="onPermChange(\'' + e.key + '\',\'write\')">') + '</td>';
-    h += '</tr>';
+    h += '<td>' + (e.noWrite ? '<span style="color:var(--gt)">—</span>' : '<input type="checkbox" id="perm-' + e.key + '-write"' + (r.write?' checked':'') + ' onchange="onPermChange(\'' + e.key + '\',\'write\')">') + '</td></tr>';
   });
   document.getElementById('perm-tbody').innerHTML = h;
 }
 
 function onPermChange(key, op) {
-  if (op === 'write') {
-    var w = document.getElementById('perm-' + key + '-write');
-    var r = document.getElementById('perm-' + key + '-read');
-    if (w && r && w.checked) r.checked = true;
-  }
-  if (op === 'read') {
-    var r2 = document.getElementById('perm-' + key + '-read');
-    var w2 = document.getElementById('perm-' + key + '-write');
-    if (r2 && w2 && !r2.checked) w2.checked = false;
-  }
+  var r = document.getElementById('perm-' + key + '-read');
+  var w = document.getElementById('perm-' + key + '-write');
+  if (op === 'write' && w && r && w.checked) r.checked = true;
+  if (op === 'read'  && r && w && !r.checked) w.checked = false;
 }
 
 function collectPermissions() {
@@ -364,23 +504,21 @@ function collectPermissions() {
   return perms;
 }
 
-// ── Existing roles ────────────────────────────────────────────
+// ── Existing roles ─────────────────────────────────────────────
 var allRolesData = [];
 
 async function loadExistingRoles() {
   var { data } = await sb.from('job_roles').select('*').eq('user_id', CU.id).order('created_at');
   allRolesData = data || [];
   var sel = document.getElementById('existing-role');
-  if (!allRolesData.length) {
-    sel.innerHTML = '<option value="">אין סוכנים קיימים — צור חדש</option>';
-    return;
-  }
-  sel.innerHTML = '<option value="">בחר סוכן...</option>' + allRolesData.map(function(r) {
-    return '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>';
-  }).join('');
+  sel.innerHTML = !allRolesData.length
+    ? '<option value="">אין סוכנים קיימים — צור חדש</option>'
+    : '<option value="">בחר סוכן...</option>' + allRolesData.map(function(r) {
+        return '<option value="' + esc(r.id) + '">' + esc(r.title) + '</option>';
+      }).join('');
 }
 
-function loadExistingRoleData() {
+async function loadExistingRoleData() {
   var id = document.getElementById('existing-role').value;
   if (!id) { document.getElementById('existing-fields').hidden = true; return; }
   var role = allRolesData.find(function(r) { return r.id === id; });
@@ -390,9 +528,47 @@ function loadExistingRoleData() {
   document.getElementById('agent-sysp').value = role.system_prompt || '';
   renderPermTable(role.permissions || {});
   document.getElementById('existing-fields').hidden = false;
+  if (id) { selectedRoleId = id; await loadKnowledgeFiles(); }
 }
 
-// ── Mode toggle ───────────────────────────────────────────────
+// ── Knowledge files list ───────────────────────────────────────
+async function loadKnowledgeFiles() {
+  var container = document.getElementById('existing-files-list');
+  if (!selectedRoleId) { container.innerHTML = '<div class="ef-empty">בחר סוכן כדי לראות קבצים</div>'; return; }
+  container.innerHTML = '<div class="ef-empty">טוען...</div>';
+  var { data } = await sb.from('role_knowledge_files')
+    .select('*').eq('role_id', selectedRoleId).eq('manager_id', CU.id)
+    .order('created_at', { ascending: false });
+  if (!data || !data.length) {
+    container.innerHTML = '<div class="ef-empty">אין קבצים בבסיס הידע עדיין</div>';
+    return;
+  }
+  container.innerHTML = data.map(function(f) {
+    var icon = /\.pdf$/i.test(f.filename) ? '📕' : /\.(xlsx|xls)$/i.test(f.filename) ? '📗' : '📄';
+    var meta = fmtSize(f.file_size || 0) + (f.chunk_count ? ' · ' + f.chunk_count + ' קטעים' : '');
+    return '<div class="ef-item">' +
+      '<div class="ef-icon">' + icon + '</div>' +
+      '<div class="ef-info"><div class="ef-name">' + esc(f.filename) + '</div><div class="ef-meta">' + esc(meta) + '</div></div>' +
+      '<button class="ef-del" onclick="deleteKnowledgeFile(\'' + f.id + '\',\'' + esc(f.filename).replace(/'/g,"\\'") + '\')" title="מחק קובץ">🗑</button>' +
+      '</div>';
+  }).join('');
+}
+
+async function deleteKnowledgeFile(fileId, filename) {
+  if (!confirm('למחוק את "' + filename + '" מבסיס הידע?\nכל קטעי הידע של הקובץ יימחקו.')) return;
+  // Delete chunks with this filename
+  await sb.from('role_knowledge_chunks')
+    .delete()
+    .eq('role_id', selectedRoleId)
+    .eq('manager_id', CU.id)
+    .eq('source_filename', filename);
+  // Delete file record
+  await sb.from('role_knowledge_files').delete().eq('id', fileId);
+  toast('הקובץ נמחק', 'success');
+  await loadKnowledgeFiles();
+}
+
+// ── Mode toggle ────────────────────────────────────────────────
 function setMode(m) {
   mode = m;
   document.getElementById('tb-new').classList.toggle('active', m === 'new');
@@ -401,7 +577,7 @@ function setMode(m) {
   document.getElementById('mode-existing').hidden = m !== 'existing';
 }
 
-// ── Step 1 → 2 ────────────────────────────────────────────────
+// ── Step 1 → 2 ─────────────────────────────────────────────────
 async function goStep2() {
   var sysp = document.getElementById('agent-sysp').value.trim();
   var perms = collectPermissions();
@@ -416,7 +592,7 @@ async function goStep2() {
     var { data, error } = await sb.from('job_roles')
       .insert({ user_id: CU.id, title: name, description: desc, responsibilities: resp, system_prompt: sysp, permissions: perms })
       .select().single();
-    btn.disabled = false; btn.textContent = 'המשך ←';
+    btn.disabled = false; btn.textContent = 'המשך לשלב הבא ←';
     if (error) { toast('שגיאה: ' + error.message, 'error'); return; }
     selectedRoleId = data.id;
   } else {
@@ -428,13 +604,46 @@ async function goStep2() {
     var { error: err2 } = await sb.from('job_roles')
       .update({ description: desc2, responsibilities: resp2, system_prompt: sysp, permissions: perms })
       .eq('id', selectedRoleId).eq('user_id', CU.id);
-    btn.disabled = false; btn.textContent = 'המשך ←';
+    btn.disabled = false; btn.textContent = 'המשך לשלב הבא ←';
     if (err2) { toast('שגיאה: ' + err2.message, 'error'); return; }
   }
+  await loadKnowledgeFiles();
   showStep('s2', 2);
 }
 
-// ── File handling ─────────────────────────────────────────────
+// ── File extraction ────────────────────────────────────────────
+async function extractText(file) {
+  if (/\.pdf$/i.test(file.name)) {
+    var ab = await file.arrayBuffer();
+    var pdf = await pdfjsLib.getDocument({ data: ab }).promise;
+    var text = '';
+    for (var i = 1; i <= pdf.numPages; i++) {
+      var page = await pdf.getPage(i);
+      var content = await page.getTextContent();
+      text += content.items.map(function(it) { return it.str; }).join(' ') + '\n';
+    }
+    return text;
+  }
+  if (/\.(xlsx|xls)$/i.test(file.name)) {
+    var ab2 = await file.arrayBuffer();
+    var wb = XLSX.read(ab2, { type: 'array' });
+    var text2 = '';
+    wb.SheetNames.forEach(function(name) {
+      text2 += '=== ' + name + ' ===\n';
+      text2 += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
+    });
+    return text2;
+  }
+  // Plain text
+  return new Promise(function(resolve) {
+    var reader = new FileReader();
+    reader.onload = function(e) { resolve(e.target.result); };
+    reader.onerror = function() { resolve(''); };
+    reader.readAsText(file);
+  });
+}
+
+// ── File handling ──────────────────────────────────────────────
 function onDragOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('over'); }
 function onDragLeave() { document.getElementById('dropzone').classList.remove('over'); }
 function onDrop(e) { e.preventDefault(); document.getElementById('dropzone').classList.remove('over'); addFiles(Array.from(e.dataTransfer.files)); }
@@ -442,15 +651,12 @@ function onFileSelect(e) { addFiles(Array.from(e.target.files)); e.target.value 
 
 function addFiles(fileObjs) {
   fileObjs.forEach(function(f) {
-    if (!/\.(txt|csv|md|eml|log)$/i.test(f.name)) { toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return; }
+    if (!/\.(txt|csv|md|eml|log|pdf|xlsx|xls)$/i.test(f.name)) {
+      toast(f.name + ' — סוג קובץ לא נתמך', 'error'); return;
+    }
     if (files.find(function(x) { return x.name === f.name; })) return;
     var entry = { name: f.name, size: f.size, fileObj: f, content: null, status: 'pending' };
-    entry.readPromise = new Promise(function(resolve) {
-      var reader = new FileReader();
-      reader.onload = function(e) { entry.content = e.target.result; resolve(); };
-      reader.onerror = function() { resolve(); };
-      reader.readAsText(f);
-    });
+    entry.readPromise = extractText(f).then(function(text) { entry.content = text; });
     files.push(entry);
     renderFileList(); updateCounter();
   });
@@ -463,12 +669,13 @@ function removeFile(name) {
 
 function renderFileList() {
   document.getElementById('file-list').innerHTML = files.map(function(f) {
+    var icon = /\.pdf$/i.test(f.name) ? '📕' : /\.(xlsx|xls)$/i.test(f.name) ? '📗' : '📄';
     var badge = f.status === 'indexed'
-      ? '<span style="color:var(--gr);font-size:11px;font-weight:700;margin-left:6px">✓</span>'
+      ? '<span style="color:var(--gr);font-size:12px;font-weight:700;flex-shrink:0">✓ הועלה</span>'
       : f.status === 'error'
-      ? '<span style="color:var(--rd);font-size:11px;margin-left:6px">שגיאה</span>'
+      ? '<span style="color:var(--rd);font-size:12px;flex-shrink:0">שגיאה</span>'
       : '';
-    return '<div class="fi"><span style="font-size:16px">📄</span><span class="fn">' + esc(f.name) + '</span><span class="fs">' + fmtSize(f.size) + '</span>' + badge + '<button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button></div>';
+    return '<div class="fi"><span style="font-size:18px">' + icon + '</span><span class="fn">' + esc(f.name) + '</span><span class="fs">' + fmtSize(f.size) + '</span>' + badge + '<button class="frm" onclick="removeFile(\'' + esc(f.name).replace(/'/g,"\\'") + '\')">×</button></div>';
   }).join('');
 }
 
@@ -479,75 +686,56 @@ function fmtSize(b) {
 }
 
 function updateCounter() {
-  var el = document.getElementById('char-counter');
-  el.textContent = files.length ? files.length + ' קבצים' : '';
-  el.className = 'cc';
+  document.getElementById('char-counter').textContent = files.length ? files.length + ' קבצים נבחרו' : '';
 }
 
-// ── Processing ────────────────────────────────────────────────
+// ── Processing ─────────────────────────────────────────────────
 async function startProcessing() {
   var paste = document.getElementById('paste-area').value.trim();
   if (!files.length && !paste) { toast('יש להכניס מידע — קבצים או טקסט', 'error'); return; }
 
   var srcCount = files.length + (paste ? 1 : 0);
   showStep('s-proc', null);
-
   await animateStep('ps-1', 20, 400);
 
-  // המתן לסיום קריאת כל הקבצים לפני שמתחילים
   await Promise.all(files.map(function(f) { return f.readPromise || Promise.resolve(); }));
-
   await animateStep('ps-2', 45, 400);
 
-  var indexed = 0;
-  var firstIndex = true;
-
-  // ── קבצים: העלאה ל-Storage (שמירה) + אינדוקס ישיר מ-content (בגושים) ──
+  var indexed = 0, firstIndex = true;
   var BATCH = 20000;
+
   for (var i = 0; i < files.length; i++) {
     var f = files[i];
     var content = f.content;
-    if (!content) {
-      toast('לא ניתן לקרוא את הקובץ: ' + f.name, 'error');
-      files[i].status = 'error'; renderFileList(); continue;
-    }
+    if (!content) { toast('לא ניתן לקרוא: ' + f.name, 'error'); files[i].status = 'error'; renderFileList(); continue; }
 
     var safeFilename = f.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
     var storagePath = CU.id + '/' + selectedRoleId + '/' + safeFilename;
 
-    // 1. העלה ל-Storage לשמירה (non-fatal)
     var fileId = null;
     var upRes = await sb.storage.from('role-knowledge').upload(storagePath, f.fileObj, { upsert: true });
     if (!upRes.error) {
       var regRes = await sb.from('role_knowledge_files').upsert({
-        role_id:      selectedRoleId,
-        manager_id:   CU.id,
-        filename:     f.name,
-        file_size:    f.size,
-        storage_path: storagePath
+        role_id: selectedRoleId, manager_id: CU.id,
+        filename: f.name, file_size: f.size, storage_path: storagePath
       }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
       if (regRes.data) fileId = regRes.data.id;
     }
 
-    // 2. אינדוקס מ-content בגושים של 20k
     var totalBatches = Math.ceil(content.length / BATCH);
     try {
       for (var bi = 0; bi < content.length; bi += BATCH) {
-        var batchNum = Math.floor(bi / BATCH) + 1;
         if (totalBatches > 1) {
           document.getElementById('ps-3').querySelector('span').textContent =
-            'בונה אינדקס... ' + batchNum + '/' + totalBatches;
+            'בונה אינדקס חכם... ' + (Math.floor(bi/BATCH)+1) + '/' + totalBatches;
         }
         var idxRes = await fetch(ROLE_WORKER_URL + '/role-index', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            role_id:    selectedRoleId,
-            manager_id: CU.id,
-            content:    content.slice(bi, bi + BATCH),
-            filename:   f.name,
-            file_id:    bi === 0 ? fileId : null,
-            append:     !(firstIndex && bi === 0)
+            role_id: selectedRoleId, manager_id: CU.id,
+            content: content.slice(bi, bi + BATCH),
+            filename: f.name, file_id: bi === 0 ? fileId : null,
+            append: !(firstIndex && bi === 0)
           })
         });
         var idxData = await idxRes.json();
@@ -559,28 +747,22 @@ async function startProcessing() {
     } catch(e) {
       files[i].status = 'error';
       var dbg = document.getElementById('debug-error');
-      dbg.textContent = e.message;
-      dbg.style.display = 'block';
+      dbg.textContent = e.message; dbg.style.display = 'block';
     }
     renderFileList();
   }
 
   await animateStep('ps-3', 75, 400);
 
-  // ── טקסט הדבוק — שלח ישירות כ-content ──
   if (paste) {
-    var BATCH = 100000;
     try {
-      for (var bi = 0; bi < paste.length; bi += BATCH) {
+      for (var bi = 0; bi < paste.length; bi += 100000) {
         var res = await fetch(ROLE_WORKER_URL + '/role-index', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            role_id:    selectedRoleId,
-            manager_id: CU.id,
-            content:    paste.slice(bi, bi + BATCH),
-            filename:   'הדבקה ידנית',
-            append:     !(firstIndex && bi === 0)
+            role_id: selectedRoleId, manager_id: CU.id,
+            content: paste.slice(bi, bi + 100000),
+            filename: 'הדבקה ידנית', append: !(firstIndex && bi === 0)
           })
         });
         var d = await res.json();
@@ -589,34 +771,26 @@ async function startProcessing() {
     } catch(e) { toast('שגיאה באינדוקס טקסט: ' + e.message, 'error'); }
   }
 
-  if (indexed === 0 && firstIndex) {
-    toast('לא הצלחנו לאנדקס את המידע', 'error');
-    showStep('s2', 2);
-    return;
-  }
+  if (indexed === 0 && firstIndex) { toast('לא הצלחנו לאנדקס את המידע', 'error'); showStep('s2', 2); return; }
 
   await animateStep('ps-4', 100, 400);
-  await sleep(500);
+  await sleep(600);
 
   document.getElementById('st-chunks').textContent = indexed;
   document.getElementById('st-files').textContent  = srcCount;
-  document.getElementById('st-chars').textContent  = srcCount;
+  document.getElementById('st-chars').textContent  = files.length;
 
   var roleName = mode === 'new'
     ? document.getElementById('agent-name').value.trim()
-    : (function() {
-        var sel = document.getElementById('existing-role');
-        return sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '';
-      })();
+    : (function() { var s = document.getElementById('existing-role'); return s.options[s.selectedIndex] ? s.options[s.selectedIndex].text : ''; })();
   document.getElementById('done-sub').textContent = '"' + roleName + '" יודע עכשיו לענות על שאלות מהמידע שהכנסת';
-
   showStep('s-done', 3);
 }
 
-var PS_ICONS = { 'ps-1': '💾', 'ps-2': '📄', 'ps-3': '🔍', 'ps-4': '✅' };
+var PS_ICONS = { 'ps-1':'💾', 'ps-2':'📄', 'ps-3':'🧠', 'ps-4':'✅' };
 
 async function animateStep(id, progress, delay) {
-  var order = ['ps-1', 'ps-2', 'ps-3', 'ps-4'];
+  var order = ['ps-1','ps-2','ps-3','ps-4'];
   var idx = order.indexOf(id);
   order.slice(0, idx).forEach(function(s) {
     var el = document.getElementById(s);
@@ -628,53 +802,41 @@ async function animateStep(id, progress, delay) {
   await sleep(delay);
 }
 
-// ── Navigation ────────────────────────────────────────────────
-function goDashboard() {
-  sessionStorage.setItem('autoOpenRole', selectedRoleId);
-  window.location.href = 'dashboard.html';
-}
+function goDashboard() { sessionStorage.setItem('autoOpenRole', selectedRoleId); window.location.href = 'dashboard.html'; }
 
 function goAgain() {
   files = [];
   document.getElementById('paste-area').value = '';
   document.getElementById('file-list').innerHTML = '';
-  document.getElementById('char-counter').textContent = '0 תווים';
+  document.getElementById('char-counter').textContent = '';
   document.getElementById('prog-fill').style.width = '0%';
   ['ps-1','ps-2','ps-3','ps-4'].forEach(function(s) {
-    var el = document.getElementById(s);
-    el.className = 'ps';
+    var el = document.getElementById(s); el.className = 'ps';
     el.querySelector('.ps-icon').textContent = PS_ICONS[s];
   });
+  loadKnowledgeFiles();
   showStep('s2', 2);
 }
 
-// ── UI helpers ────────────────────────────────────────────────
 function showStep(id, stepNum) {
-  ['s1','s2','s-proc','s-done'].forEach(function(s) {
-    document.getElementById(s).hidden = s !== id;
-  });
+  ['s1','s2','s-proc','s-done'].forEach(function(s) { document.getElementById(s).hidden = s !== id; });
   if (stepNum === null) return;
-  ['si-1','si-2','si-3'].forEach(function(s, i) {
-    var n = i + 1;
-    var el = document.getElementById(s);
-    if (n < stepNum) { el.className = 'si done'; el.querySelector('.si-num').textContent = '✓'; }
-    else if (n === stepNum) { el.className = 'si active'; el.querySelector('.si-num').textContent = n; }
-    else { el.className = 'si'; el.querySelector('.si-num').textContent = n; }
+  [1,2,3].forEach(function(n) {
+    var si = document.getElementById('si-' + n), sn = document.getElementById('sn-' + n);
+    if (n < stepNum)      { si.className = 'step-item done';   sn.textContent = '✓'; }
+    else if (n===stepNum) { si.className = 'step-item active'; sn.textContent = n; }
+    else                  { si.className = 'step-item';        sn.textContent = n; }
   });
+  [1,2].forEach(function(n) { document.getElementById('sl-'+n).className = 'step-line' + (n < stepNum ? ' done' : ''); });
 }
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
-
-function esc(s) {
-  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-}
-
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 function toast(msg, type) {
   var el = document.getElementById('toast');
-  el.textContent = msg;
-  el.className = 'toast show' + (type ? ' ' + type : '');
+  el.textContent = msg; el.className = 'toast show' + (type ? ' '+type : '');
   clearTimeout(el._t);
-  el._t = setTimeout(function() { el.className = 'toast'; }, type === 'error' ? 12000 : 3000);
+  el._t = setTimeout(function() { el.className = 'toast'; }, type==='error' ? 12000 : 3000);
 }
 </script>
 </body>

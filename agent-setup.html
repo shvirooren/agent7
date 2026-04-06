@@ -614,31 +614,43 @@ async function goStep2() {
 // ── File extraction ────────────────────────────────────────────
 async function extractText(file) {
   if (/\.pdf$/i.test(file.name)) {
-    var ab = await file.arrayBuffer();
-    var pdf = await pdfjsLib.getDocument({ data: ab }).promise;
-    var text = '';
-    for (var i = 1; i <= pdf.numPages; i++) {
-      var page = await pdf.getPage(i);
-      var content = await page.getTextContent();
-      text += content.items.map(function(it) { return it.str; }).join(' ') + '\n';
+    try {
+      if (!window.pdfjsLib) throw new Error('PDF.js לא נטען — נסה לרענן את הדף');
+      var ab = await file.arrayBuffer();
+      var pdf = await pdfjsLib.getDocument({ data: new Uint8Array(ab) }).promise;
+      var text = '';
+      for (var i = 1; i <= pdf.numPages; i++) {
+        var page = await pdf.getPage(i);
+        var ct = await page.getTextContent();
+        text += ct.items.map(function(it) { return it.str; }).join(' ') + '\n';
+      }
+      if (!text.trim()) throw new Error('ה-PDF לא מכיל טקסט שניתן לחלץ (ייתכן שהוא סרוק/תמונה)');
+      return text;
+    } catch(e) {
+      toast('שגיאת PDF: ' + e.message, 'error');
+      return null;
     }
-    return text;
   }
   if (/\.(xlsx|xls)$/i.test(file.name)) {
-    var ab2 = await file.arrayBuffer();
-    var wb = XLSX.read(ab2, { type: 'array' });
-    var text2 = '';
-    wb.SheetNames.forEach(function(name) {
-      text2 += '=== ' + name + ' ===\n';
-      text2 += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
-    });
-    return text2;
+    try {
+      var ab2 = await file.arrayBuffer();
+      var wb = XLSX.read(ab2, { type: 'array' });
+      var text2 = '';
+      wb.SheetNames.forEach(function(name) {
+        text2 += '=== ' + name + ' ===\n';
+        text2 += XLSX.utils.sheet_to_csv(wb.Sheets[name]) + '\n';
+      });
+      return text2;
+    } catch(e) {
+      toast('שגיאת Excel: ' + e.message, 'error');
+      return null;
+    }
   }
   // Plain text
   return new Promise(function(resolve) {
     var reader = new FileReader();
     reader.onload = function(e) { resolve(e.target.result); };
-    reader.onerror = function() { resolve(''); };
+    reader.onerror = function() { resolve(null); };
     reader.readAsText(file);
   });
 }

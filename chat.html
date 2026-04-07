@@ -191,6 +191,9 @@ function setSending(on) {
 
     document.getElementById('agent-name').textContent = role.title || 'סוכן AI';
     document.getElementById('agent-sub').textContent  = role.description || 'מוכן לשאלות';
+    var backUrl = sessionStorage.getItem('chatBackUrl') || '';
+    var backLabel = backUrl.includes('dashboard') ? '← דשבורד' : backUrl.includes('employee') ? '← חזור' : '← שנה הגדרות';
+    document.querySelector('.back-btn').textContent = backLabel;
     document.getElementById('loading').style.display = 'none';
     document.getElementById('hdr').style.display = 'flex';
     document.getElementById('send-btn').disabled = false;
@@ -385,8 +388,14 @@ function appendMsg(text, cls) {
 }
 
 function goBack() {
-  var back = sessionStorage.getItem('chatBackUrl') || 'agent-setup.html';
-  window.location.href = back;
+  var back = sessionStorage.getItem('chatBackUrl');
+  if (!back && document.referrer) {
+    var ref = document.referrer;
+    if (ref.includes('dashboard')) back = 'dashboard.html';
+    else if (ref.includes('employee')) back = 'employee.html';
+    else if (ref.includes('agent-setup')) back = 'agent-setup.html';
+  }
+  window.location.href = back || 'dashboard.html';
 }
 
 function esc(s) {

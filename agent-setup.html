@@ -848,7 +848,7 @@ function toast(msg, type) {
   var el = document.getElementById('toast');
   el.textContent = msg; el.className = 'toast show' + (type ? ' '+type : '');
   clearTimeout(el._t);
-  el._t = setTimeout(function() { el.className = 'toast'; }, type==='error' ? 12000 : 3000);
+  el._t = setTimeout(function() { el.className = 'toast'; }, 2000);
 }
 </script>
 </body>

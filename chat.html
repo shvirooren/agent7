@@ -200,8 +200,9 @@ function setSending(on) {
     document.getElementById('inp').focus();
     showSuggestions();
     if (!CU.is_anonymous) initMemory();
-    var empId = sessionStorage.getItem('chatEmployeeId');
-    var mgrId = sessionStorage.getItem('chatManagerId');
+    var urlParams = new URLSearchParams(window.location.search);
+    var empId = urlParams.get('emp') || sessionStorage.getItem('chatEmployeeId');
+    var mgrId = urlParams.get('mgr') || sessionStorage.getItem('chatManagerId');
     if (empId) {
       _chatEmpId = empId;
       if (mgrId) _chatMgrId = mgrId;
@@ -438,10 +439,10 @@ async function loadEmployeeTasks(empId) {
 
 async function initMemory() {
   try {
-    var agentRes = await sb.from('role_agents').select('*').eq('role_id', role.id).eq('user_id', CU.id).maybeSingle();
+    var agentRes = await sb.from('role_agents').select('*').eq('role_id', role.id).maybeSingle();
     var agent = agentRes.data;
     if (!agent) {
-      var ins = await sb.from('role_agents').insert({ user_id: CU.id, role_id: role.id, total_conversations: 0 }).select().maybeSingle();
+      var ins = await sb.from('role_agents').upsert({ user_id: CU.id, role_id: role.id, total_conversations: 0 }, { onConflict: 'role_id' }).select().maybeSingle();
       agent = ins.data;
     }
     if (!agent) return;

@@ -340,15 +340,15 @@ async function send() {
 function generatePDF(data) {
   var sections = '';
   (data.sections || []).forEach(function(s) {
-    if (s.heading) sections += '<h2>' + s.heading + '</h2>';
+    if (s.heading) sections += '<h2>' + esc(s.heading) + '</h2>';
     if (s.type === 'text') {
-      sections += '<p>' + (s.content || '').replace(/\n/g, '<br>') + '</p>';
+      sections += '<p>' + esc(s.content || '').replace(/\n/g, '<br>') + '</p>';
     } else if (s.type === 'table' && s.headers) {
-      sections += '<table><thead><tr>' + s.headers.map(function(h){ return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
-      (s.rows || []).forEach(function(row){ sections += '<tr>' + row.map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>'; });
+      sections += '<table><thead><tr>' + s.headers.map(function(h){ return '<th>' + esc(h) + '</th>'; }).join('') + '</tr></thead><tbody>';
+      (s.rows || []).forEach(function(row){ sections += '<tr>' + row.map(function(c){ return '<td>' + esc(c) + '</td>'; }).join('') + '</tr>'; });
       sections += '</tbody></table>';
     } else if (s.type === 'list') {
-      sections += '<ul>' + (s.items || []).map(function(i){ return '<li>' + i + '</li>'; }).join('') + '</ul>';
+      sections += '<ul>' + (s.items || []).map(function(i){ return '<li>' + esc(i) + '</li>'; }).join('') + '</ul>';
     }
   });
   var html = '<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><title>' + (data.title || 'מסמך') + '</title><style>'
@@ -364,8 +364,8 @@ function generatePDF(data) {
     + 'ul{margin:8px 0;padding-right:20px}'
     + 'li{font-size:13px;line-height:1.7}'
     + '</style></head><body>'
-    + '<h1>' + (data.title || '') + '</h1>'
-    + (data.subtitle ? '<div class="sub">' + data.subtitle + '</div>' : '')
+    + '<h1>' + esc(data.title || '') + '</h1>'
+    + (data.subtitle ? '<div class="sub">' + esc(data.subtitle) + '</div>' : '')
     + sections + '</body></html>';
   var w = window.open('', '_blank');
   if (w) { w.document.write(html); w.document.close(); setTimeout(function(){ w.print(); }, 400); }

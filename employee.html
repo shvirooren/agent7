@@ -352,7 +352,7 @@ function skeletonCards(n){
 //  STATE
 // ═══════════════════════════
 var CU=null, EMP_ID=null, MANAGER_ID=null, SESSION_JWT=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null;
-var pendingStatusUpdate={};  // taskId → true  (debounce double-clicks)
+var pendingStatusUpdate={}, pendingStatusTimer={};  // taskId → true  (debounce double-clicks)
 
 // ── Greeting ──
 var now=new Date(), hour=now.getHours();
@@ -418,10 +418,9 @@ function getEmployeeId(){
 
     loadTasks();
 
-    // Realtime subscription
-    // INSERT/UPDATE מגיעים עם הנתונים — הפילטר עובד
-    // DELETE לא מכיל נתונים אחרי המחיקה, הפילטר לא יפעל — מאזינים בנפרד
-    sb.channel('emp-tasks-'+EMP_ID)
+    // Realtime subscription — שמירת reference למניעת כפילות
+    if(window._empTasksChannel) sb.removeChannel(window._empTasksChannel);
+    window._empTasksChannel=sb.channel('emp-tasks-'+EMP_ID)
       .on('postgres_changes',{event:'INSERT',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
         function(){loadTasks();})
       .on('postgres_changes',{event:'UPDATE',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
@@ -436,26 +435,18 @@ function getEmployeeId(){
 //  DATA
 // ═══════════════════════════
 function loadTasks(){
-  sb.from('tasks').select('*').eq('employee_id',EMP_ID).order('created_at',{ascending:false})
+  sb.from('tasks').select('*, files(id,file_name,file_url)').eq('employee_id',EMP_ID).order('created_at',{ascending:false})
     .then(function(r){
       if(r.error){showErr('שגיאה בטעינת משימות: '+r.error.message);return;}
-      allTasks=r.data||[];
-
-      sb.from('files').select('id,file_name,file_url,task_id').eq('employee_id',EMP_ID)
-        .then(function(fr){
-          var fm={};
-          if(fr.error){renderTasks({});return;}
-          if(fr.data)fr.data.forEach(function(f){if(f.task_id){if(!fm[f.task_id])fm[f.task_id]=[];fm[f.task_id].push(f);}});
-          allTasks=allTasks.map(function(t){t.files=fm[t.id]||[];return t;});
-          // Sort: open first, in-progress, done last
-          allTasks.sort(function(a,b){
-            var order={פתוח:0,בביצוע:1,הושלם:2};
-            return (order[a.status]||0)-(order[b.status]||0);
-          });
-          updateStats();
-          if(currentView==='kanban')renderKanban();
-          else renderTasks();
-        });
+      allTasks=(r.data||[]).map(function(t){t.files=t.files||[];return t;});
+      // Sort: open first, in-progress, done last
+      allTasks.sort(function(a,b){
+        var order={פתוח:0,בביצוע:1,הושלם:2};
+        return (order[a.status]||0)-(order[b.status]||0);
+      });
+      updateStats();
+      if(currentView==='kanban')renderKanban();
+      else renderTasks();
     });
 }
 
@@ -471,13 +462,16 @@ function updateStats(){
 function updateStatus(id,status,btn){
   if(pendingStatusUpdate[id])return; // prevent double-click
   pendingStatusUpdate[id]=true;
+  pendingStatusTimer[id]=setTimeout(function(){delete pendingStatusUpdate[id];delete pendingStatusTimer[id];if(btn)btn.disabled=false;},15000);
   if(btn){
     btn.disabled=true;
     btn.innerHTML=btn.innerHTML+'<span class="btn-spinner"></span>';
   }
   sb.from('tasks').update({status:status,updated_at:new Date().toISOString()}).eq('id',id)
     .then(function(r){
+      clearTimeout(pendingStatusTimer[id]);
       delete pendingStatusUpdate[id];
+      delete pendingStatusTimer[id];
       if(r.error){
         toast('שגיאה בעדכון סטטוס','error');
         if(btn){btn.disabled=false;btn.innerHTML=btn.innerHTML.replace(/<span class="btn-spinner"><\/span>/,'');}
@@ -671,10 +665,11 @@ function openEmployeeAgent(){
 //  ROLE AGENT — הסוכן שלי
 // ══════════════════════════════════════════
 var WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
-var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false;
+var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false, roleAgentLoaded=false;
 
 function loadRoleAgent(){
-  if(!EMP_ID)return;
+  if(!EMP_ID||roleAgentLoaded)return;
+  roleAgentLoaded=true;
   // טוען עובד עם תפקיד
   sb.from('employees').select('*, job_roles(*)').eq('id',EMP_ID).maybeSingle().then(function(r){
     var emp=r.data;
@@ -821,21 +816,21 @@ function generatePdf(btn){
   var date=new Date().toLocaleDateString('he-IL');
 
   var sectionsHtml=d.sections.map(function(s){
-    var h=s.heading?'<h3 style="font-size:15px;font-weight:800;color:#003366;margin:0 0 10px;border-bottom:1px solid #E2E8EF;padding-bottom:6px">'+s.heading+'</h3>':'';
+    var h=s.heading?'<h3 style="font-size:15px;font-weight:800;color:#003366;margin:0 0 10px;border-bottom:1px solid #E2E8EF;padding-bottom:6px">'+esc(s.heading)+'</h3>':'';
     if(s.type==='table'&&s.headers&&s.rows){
-      var th=s.headers.map(function(c){return'<th style="background:#003366;color:#fff;padding:9px 14px;font-size:13px;font-weight:700;text-align:right">'+c+'</th>';}).join('');
+      var th=s.headers.map(function(c){return'<th style="background:#003366;color:#fff;padding:9px 14px;font-size:13px;font-weight:700;text-align:right">'+esc(c)+'</th>';}).join('');
       var tr=s.rows.map(function(row,i){
         var bg=i%2===0?'#fff':'#F5F7FA';
-        var td=row.map(function(c){return'<td style="padding:9px 14px;font-size:13px;border-bottom:1px solid #E2E8EF">'+c+'</td>';}).join('');
+        var td=row.map(function(c){return'<td style="padding:9px 14px;font-size:13px;border-bottom:1px solid #E2E8EF">'+esc(c)+'</td>';}).join('');
         return'<tr style="background:'+bg+'">'+td+'</tr>';
       }).join('');
       return'<div style="margin-bottom:24px">'+h+'<table style="width:100%;border-collapse:collapse;border:1px solid #E2E8EF;border-radius:8px;overflow:hidden"><thead><tr>'+th+'</tr></thead><tbody>'+tr+'</tbody></table></div>';
     }
     if(s.type==='list'&&s.items){
-      var li=s.items.map(function(item){return'<li style="padding:5px 0;font-size:14px;color:#1A2B3C">'+item+'</li>';}).join('');
+      var li=s.items.map(function(item){return'<li style="padding:5px 0;font-size:14px;color:#1A2B3C">'+esc(item)+'</li>';}).join('');
       return'<div style="margin-bottom:24px">'+h+'<ul style="padding-right:20px;margin:0">'+li+'</ul></div>';
     }
-    return'<div style="margin-bottom:24px">'+h+(s.content?'<p style="font-size:14px;color:#1A2B3C;line-height:1.8;white-space:pre-wrap">'+s.content+'</p>':'')+'</div>';
+    return'<div style="margin-bottom:24px">'+h+(s.content?'<p style="font-size:14px;color:#1A2B3C;line-height:1.8;white-space:pre-wrap">'+esc(s.content)+'</p>':'')+'</div>';
   }).join('');
 
   var html='<!DOCTYPE html><html lang="he" dir="rtl"><head><meta charset="UTF-8"><title>'+d.title+'</title>'
@@ -845,7 +840,7 @@ function generatePdf(btn){
     +'</style></head><body>'
     +'<div style="max-width:800px;margin:0 auto">'
     +'<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:32px;padding-bottom:20px;border-bottom:3px solid #003366">'
-    +'<div><div style="font-size:28px;font-weight:900;color:#003366;margin-bottom:4px">'+d.title+'</div>'+(d.subtitle?'<div style="font-size:14px;color:#5A6A7A">'+d.subtitle+'</div>':'')+'</div>'
+    +'<div><div style="font-size:28px;font-weight:900;color:#003366;margin-bottom:4px">'+esc(d.title)+'</div>'+(d.subtitle?'<div style="font-size:14px;color:#5A6A7A">'+esc(d.subtitle)+'</div>':'')+'</div>'
     +'<div style="text-align:left"><div style="font-size:15px;font-weight:800;color:#003366">'+esc(companyName)+'</div><div style="font-size:13px;color:#5A6A7A">'+date+'</div></div></div>'
     +sectionsHtml
     +'<div style="margin-top:40px;padding-top:16px;border-top:1px solid #E2E8EF;font-size:11px;color:#5A6A7A;text-align:center">נוצר על ידי Agent 7 · '+date+'</div>'
@@ -912,7 +907,8 @@ function confirmDbAction(){
   btn.disabled=true; btn.textContent='מבצע...';
   // Refresh JWT before sending
   sb.auth.getSession().then(function(sr){
-    var jwt=sr.data&&sr.data.session?sr.data.session.access_token:SESSION_JWT;
+    if(!sr.data||!sr.data.session){toast('הסשן פג תוקף — אנא התחבר מחדש','error');setTimeout(function(){window.location.href='login.html';},1500);return;}
+    var jwt=sr.data.session.access_token;
     fetch(WORKER_URL+'/role-action',{
       method:'POST',
       headers:{'Content-Type':'application/json'},

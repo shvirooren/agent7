@@ -584,7 +584,7 @@ async function goStep2() {
 
   if (mode === 'new') {
     var name = document.getElementById('agent-name').value.trim();
-    if (!name) { toast('יש להזין שם לסוכן', 'error'); return; }
+    if (!name || name.length < 2) { toast('שם הסוכן חייב להכיל לפחות 2 תווים', 'error'); return; }
     var desc = document.getElementById('agent-desc').value.trim();
     var resp = document.getElementById('agent-resp').value.trim();
     btn.disabled = true; btn.textContent = 'יוצר סוכן...';

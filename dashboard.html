@@ -2666,7 +2666,7 @@ function loadRoleAgents(){
         h+='<div style="flex:1;background:'+(hasSP?'var(--gp)':'var(--gl)')+';;border-radius:7px;padding:8px;text-align:center"><div style="font-size:16px">'+(hasSP?'✅':'—')+'</div><div style="font-size:10px;color:var(--gt)">הוראות</div></div>';
         h+='</div>';
         h+='<div style="display:flex;gap:5px;flex-wrap:wrap">';
-        h+='<button class="bsm bsb" data-role-id="'+esc(role.id)+'" onclick="openRoleChat(this)" style="flex:1;min-width:70px">💬 שיחה</button>';
+        h+='<button class="bsm bsb" data-role-id="'+esc(role.id)+'" data-role-title="'+esc(role.title)+'" onclick="openRoleChat(this)" style="flex:1;min-width:70px">💬 שיחה</button>';
         h+='<button class="bsm" style="background:var(--op);color:var(--or);flex:1;min-width:70px" data-role-id="'+esc(role.id)+'" onclick="editAgentSetup(this)">✏️ ערוך</button>';
         if(agent){h+='<button class="bsm bsb" data-agent-id="'+esc(agent.id)+'" data-title="'+esc(role.title)+'" onclick="openAgentMemoryModal(this)" title="זיכרון">📚</button>';}
         h+='<button class="bsm bsr" data-id="'+esc(role.id)+'" onclick="deleteRole(this)" title="מחק">🗑️</button>';
@@ -2940,6 +2940,12 @@ var _rcaRoleId=null, _rcaHistory=[];
 
 function openRoleChat(btn){
   var roleId=btn.dataset.roleId;
+  var roleTitle=btn.dataset.roleTitle||'';
+  // סוכן המנהל האישי → פתח את הצ'אט הפנימי עם נתונים חיים
+  if(roleTitle===MANAGER_AGENT_TITLE){
+    sp('chat');
+    return;
+  }
   sessionStorage.setItem('autoOpenRole', roleId);
   sessionStorage.setItem('chatBackUrl', 'dashboard.html');
   window.location.href='chat.html';

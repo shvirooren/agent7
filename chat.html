@@ -165,7 +165,7 @@ var sb = supabase.createClient(SURL, SKEY);
 
 var CU = null, role = null, chatHistory = [], currentCtrl = null;
 var agentMemory = [], agentId = null, _learnInProgress = false;
-var employeeTasksCtx = '';
+var employeeTasksCtx = '', _chatEmpId = null;
 
 function stopChat() {
   if (currentCtrl) { currentCtrl.abort(); currentCtrl = null; }
@@ -201,7 +201,7 @@ function setSending(on) {
     showSuggestions();
     if (!CU.is_anonymous) initMemory();
     var empId = sessionStorage.getItem('chatEmployeeId');
-    if (empId) { sessionStorage.removeItem('chatEmployeeId'); loadEmployeeTasks(empId); }
+    if (empId) { _chatEmpId = empId; sessionStorage.removeItem('chatEmployeeId'); await loadEmployeeTasks(empId); }
   } catch(e) {
     showLoadErr('שגיאה: ' + e.message);
   }
@@ -248,6 +248,7 @@ async function send() {
   var inp = document.getElementById('inp');
   var text = inp.value.trim();
   if (!text || !role) return;
+  if (_chatEmpId) await loadEmployeeTasks(_chatEmpId);
   inp.value = ''; inp.style.height = 'auto';
   hideSuggestions();
 

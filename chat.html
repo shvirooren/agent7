@@ -164,6 +164,7 @@ var ROLE_WORKER_URL = 'https://agent7-rules.shvirooren.workers.dev';
 var sb = supabase.createClient(SURL, SKEY);
 
 var CU = null, role = null, chatHistory = [], currentCtrl = null;
+var agentMemory = [], agentId = null, _learnInProgress = false;
 
 function stopChat() {
   if (currentCtrl) { currentCtrl.abort(); currentCtrl = null; }
@@ -197,6 +198,7 @@ function setSending(on) {
     document.getElementById('send-btn').disabled = false;
     document.getElementById('inp').focus();
     showSuggestions();
+    if (!CU.is_anonymous) initMemory();
   } catch(e) {
     showLoadErr('שגיאה: ' + e.message);
   }
@@ -269,7 +271,7 @@ async function send() {
           responsibilities: role.responsibilities || '',
           system_prompt:    role.system_prompt || ''
         },
-        memory:               [],
+        memory:               agentMemory,
         conversation_history: chatHistory.slice(-8),
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
@@ -322,7 +324,10 @@ async function send() {
       }
     }
 
-    if (fullReply) chatHistory.push({ role: 'assistant', content: fullReply });
+    if (fullReply) {
+      chatHistory.push({ role: 'assistant', content: fullReply });
+      if (agentId && chatHistory.length % 8 === 0) triggerLearn();
+    }
     if (firstToken) { streamDiv.remove(); appendMsg('שגיאה בקבלת תשובה', 'ai'); }
 
   } catch(e) {
@@ -385,7 +390,7 @@ function appendMsg(text, cls) {
   return d;
 }
 
-function goBack() {
+async function goBack() {
   var back = sessionStorage.getItem('chatBackUrl');
   if (!back && document.referrer) {
     var ref = document.referrer;
@@ -395,7 +400,64 @@ function goBack() {
   }
   sessionStorage.removeItem('autoOpenRole');
   sessionStorage.removeItem('chatBackUrl');
+  if (agentId && chatHistory.length >= 4) await triggerLearn();
   window.location.href = back || 'dashboard.html';
+}
+
+async function initMemory() {
+  try {
+    var agentRes = await sb.from('role_agents').select('*').eq('role_id', role.id).eq('user_id', CU.id).maybeSingle();
+    var agent = agentRes.data;
+    if (!agent) {
+      var ins = await sb.from('role_agents').insert({ user_id: CU.id, role_id: role.id, total_conversations: 0 }).select().maybeSingle();
+      agent = ins.data;
+    }
+    if (!agent) return;
+    agentId = agent.id;
+    var memRes = await sb.from('role_agent_memory').select('category,content,importance')
+      .eq('agent_id', agentId).order('importance', { ascending: false }).limit(10);
+    agentMemory = memRes.data || [];
+  } catch(e) {}
+}
+
+async function triggerLearn() {
+  if (!agentId || chatHistory.length < 4 || _learnInProgress) return;
+  _learnInProgress = true;
+  try {
+    var r = await fetch(ROLE_WORKER_URL + '/role-learn', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ conversation_history: chatHistory, role_profile: role, agent_id: agentId })
+    });
+    var data = await r.json();
+    var insights = data.insights || [];
+    if (!insights.length) return;
+
+    var contents = insights.map(function(i) { return i.content || ''; });
+    var embedData = {};
+    try {
+      var er = await fetch(ROLE_WORKER_URL + '/embed', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ texts: contents })
+      });
+      embedData = await er.json();
+    } catch(e) {}
+    var embeddings = embedData.embeddings || [];
+
+    var inserts = insights.map(function(ins, i) {
+      var row = { agent_id: agentId, category: ins.category || 'insight', content: ins.content,
+                  importance: Math.min(5, Math.max(1, ins.importance || 1)) };
+      if (embeddings[i]) row.embedding = JSON.stringify(embeddings[i]);
+      return row;
+    });
+    await sb.from('role_agent_memory').insert(inserts);
+    await sb.from('role_agents').update({ last_active: new Date().toISOString() }).eq('id', agentId);
+
+    var memRes = await sb.from('role_agent_memory').select('category,content,importance')
+      .eq('agent_id', agentId).order('importance', { ascending: false }).limit(10);
+    agentMemory = memRes.data || [];
+  } catch(e) {}
+  finally { _learnInProgress = false; }
 }
 
 function esc(s) {

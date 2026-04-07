@@ -579,7 +579,7 @@ function setMode(m) {
 // ── Step 1 → 2 ─────────────────────────────────────────────────
 async function goStep2() {
   var sysp = document.getElementById('agent-sysp').value.trim();
-  var perms = collectPermissions();
+  var perms = { tasks:{read:true,write:false}, employees:{read:true,write:false}, shipments:{read:true,write:false}, quotes:{read:true,write:false}, orders:{read:true,write:false} };
   var btn = document.querySelector('#s1 .btn-p');
 
   if (mode === 'new') {

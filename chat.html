@@ -275,7 +275,7 @@ async function send() {
         conversation_history: chatHistory.slice(-8),
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
-        permissions:          role.permissions || {},
+        permissions:          CU.is_anonymous ? { tasks:{read:true,write:false}, employees:{read:true,write:false}, shipments:{read:true,write:false}, quotes:{read:true,write:false}, orders:{read:true,write:false} } : (role.permissions || {}),
         manager_id:           CU.id,
         stream:               true
       })

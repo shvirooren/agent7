@@ -2882,6 +2882,7 @@ async function sendRoleMsg(){
           box.scrollTop=box.scrollHeight;
         }else if(evt.action){
           typing.remove();
+          firstToken=false;
           var msg=evt.reply||'המסמך מוכן.';
           appendRoleMsg(msg+' 📄 [לחץ להורדה]','ai');
           _rcaHistory.push({role:'assistant',content:msg});

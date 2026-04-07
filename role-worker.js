@@ -339,7 +339,7 @@ const ACTION_PERMISSIONS = {
 // ─── POST /role-chat ──────────────────────────────────────────
 
 async function handleRoleChat(request, env, cors) {
-  const { role_profile, memory, conversation_history, new_message, today, permissions, manager_id, stream } = await request.json();
+  const { role_profile, memory, conversation_history, new_message, today, permissions, manager_id, employee_id, stream } = await request.json();
 
   if (!new_message) return jsonRes({ error: 'new_message is required' }, cors, 400);
 
@@ -393,16 +393,23 @@ async function handleRoleChat(request, env, cors) {
 
     if (permissions.tasks?.read) {
       try {
-        const tasks = await sbGet(env, 'tasks', {
-          select: 'id,title,status,priority',
-          user_id: manager_id,
+        const taskParams = {
+          select: 'id,title,description,status,priority',
           order: 'created_at.desc',
           limit: '40'
-        });
+        };
+        if (employee_id) {
+          taskParams.employee_id = employee_id;
+        } else {
+          taskParams.user_id = manager_id;
+        }
+        const tasks = await sbGet(env, 'tasks', taskParams);
         if (tasks.length) {
-          parts.push('משימות:\n' + tasks.map(t =>
-            `[id:${t.id}] ${t.title} | סטטוס:${t.status} | עדיפות:${t.priority}`
+          parts.push('משימות' + (employee_id ? ' של העובד' : '') + ':\n' + tasks.map(t =>
+            `[id:${t.id}] ${t.title}${t.description ? ' — ' + t.description.slice(0,80) : ''} | סטטוס:${t.status} | עדיפות:${t.priority}`
           ).join('\n'));
+        } else if (employee_id) {
+          parts.push('משימות של העובד: אין משימות פתוחות כרגע.');
         }
       } catch(e) {}
     }

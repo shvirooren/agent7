@@ -2816,14 +2816,29 @@ function saveRole(){
 }
 
 // מחיקת תפקיד
-function deleteRole(btn){
+async function deleteRole(btn){
   if(!confirm('למחוק תפקיד זה? הסוכן וכל הזיכרון שלו יימחקו.'))return;
   var id=btn.dataset.id;
-  sb.from('job_roles').delete().eq('id',id).then(function(r){
-    if(r.error){toast('שגיאה במחיקה','error');return;}
-    toast('התפקיד נמחק','info');
+  try {
+    // מחק זיכרון וסוכן (אין CASCADE מוגדר)
+    var agentRes=await sb.from('role_agents').select('id').eq('role_id',id);
+    var agentIds=(agentRes.data||[]).map(function(a){return a.id;});
+    if(agentIds.length){
+      await sb.from('role_agent_memory').delete().in('agent_id',agentIds);
+      await sb.from('role_agents').delete().eq('role_id',id);
+    }
+    // מחק קבצים מ-Storage
+    var filesRes=await sb.from('role_knowledge_files').select('storage_path').eq('role_id',id);
+    var paths=(filesRes.data||[]).map(function(f){return f.storage_path;}).filter(Boolean);
+    if(paths.length) await sb.storage.from('role-knowledge').remove(paths);
+    // מחק את הסוכן עצמו (יגרור CASCADE ל-chunks + files)
+    var r=await sb.from('job_roles').delete().eq('id',id);
+    if(r.error)throw new Error(r.error.message);
+    toast('הסוכן נמחק לחלוטין','info');
     loadRoleAgents();
-  });
+  } catch(e){
+    toast('שגיאה במחיקה: '+e.message,'error');
+  }
 }
 
 // פתיחת מודל זיכרון הסוכן

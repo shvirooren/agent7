@@ -165,7 +165,16 @@ var SKEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI
 var ROLE_WORKER_URL = 'https://agent7-rules.shvirooren.workers.dev';
 var sb = supabase.createClient(SURL, SKEY);
 
-var CU = null, role = null, chatHistory = [];
+var CU = null, role = null, chatHistory = [], currentCtrl = null;
+
+function stopChat() {
+  if (currentCtrl) { currentCtrl.abort(); currentCtrl = null; }
+}
+function setSending(on) {
+  var btn = document.getElementById('send-btn');
+  if (on) { btn.textContent = '■'; btn.onclick = stopChat; btn.style.background = '#ef4444'; btn.disabled = false; }
+  else     { btn.textContent = '➤'; btn.onclick = send;     btn.style.background = ''; btn.disabled = false; }
+}
 
 (async function init() {
   try {
@@ -242,14 +251,14 @@ async function send() {
   var streamDiv = appendMsg('חושב...', 'ai typing');
   var bubble = streamDiv.querySelector('.bubble');
   var firstToken = true;
-  document.getElementById('send-btn').disabled = true;
+  currentCtrl = new AbortController();
+  setSending(true);
 
   try {
-    var ctrl = new AbortController();
-    var timeout = setTimeout(function() { ctrl.abort(); }, 30000);
+    var timeout = setTimeout(function() { if (currentCtrl) currentCtrl.abort(); }, 30000);
     var r = await fetch(ROLE_WORKER_URL + '/role-chat', {
       method: 'POST',
-      signal: ctrl.signal,
+      signal: currentCtrl.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         role_profile: {
@@ -308,15 +317,12 @@ async function send() {
 
   } catch(e) {
     streamDiv.remove();
-    if (e.name === 'AbortError') {
-      appendMsg('פג תוקף — הסוכן לא ענה בזמן. נסה שוב.', 'ai');
-    } else {
-      appendMsg('שגיאת חיבור: ' + e.message, 'ai');
-    }
+    if (e.name !== 'AbortError') appendMsg('שגיאת חיבור: ' + e.message, 'ai');
+  } finally {
+    currentCtrl = null;
+    setSending(false);
+    document.getElementById('inp').focus();
   }
-
-  document.getElementById('send-btn').disabled = false;
-  document.getElementById('inp').focus();
 }
 
 function appendMsg(text, cls) {

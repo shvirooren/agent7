@@ -548,7 +548,7 @@ body{overflow-x:hidden}
         </div>
         <div style="padding:12px 16px;border-top:1px solid var(--gm);display:flex;gap:8px;flex-shrink:0;background:#fff;align-items:flex-end">
           <textarea id="rca-input" class="fi" rows="1" placeholder="כתוב הודעה לסוכן..." onkeydown="rcaKeydown(event)" style="flex:1;resize:none;min-height:40px;max-height:120px;overflow-y:auto;padding:10px 12px;font-size:14px"></textarea>
-          <button onclick="sendRoleMsg()" class="bsv" style="padding:10px 18px;flex-shrink:0">שלח</button>
+          <button id="rca-send-btn" onclick="sendRoleMsg()" class="bsv" style="padding:10px 18px;flex-shrink:0">שלח</button>
           <button id="rca-train-btn" onclick="trainRoleAgent()" class="bot" style="padding:10px 14px;flex-shrink:0;font-size:12px" title="סיים שיחה ושמור תובנות לזיכרון הסוכן">🧠 אמן</button>
         </div>
       </div>
@@ -2803,6 +2803,17 @@ function appendRoleMsg(text,type){
   return d;
 }
 
+var _rcaCtrl=null;
+function stopRoleMsg(){
+  if(_rcaCtrl){_rcaCtrl.abort();_rcaCtrl=null;}
+}
+function _rcaSetSending(on){
+  var btn=document.getElementById('rca-send-btn');
+  if(!btn)return;
+  if(on){btn.textContent='■ עצור';btn.onclick=stopRoleMsg;btn.style.background='#ef4444';}
+  else{btn.textContent='שלח';btn.onclick=sendRoleMsg;btn.style.background='';}
+}
+
 async function sendRoleMsg(){
   var input=document.getElementById('rca-input');
   var text=input.value.trim();
@@ -2819,10 +2830,13 @@ async function sendRoleMsg(){
     .order('importance',{ascending:false}).limit(8);
   var memory=memRes.data||[];
 
+  _rcaCtrl=new AbortController();
+  _rcaSetSending(true);
   var rcaBubble=typing.children[1];
   var firstToken=true;
   try{
     var r=await fetch(ROLE_WORKER_URL+'/role-chat',{
+      signal:_rcaCtrl.signal,
       method:'POST',
       headers:{'Content-Type':'application/json'},
       body:JSON.stringify({
@@ -2878,7 +2892,10 @@ async function sendRoleMsg(){
     if(firstToken){typing.remove();appendRoleMsg('שגיאה בקבלת תשובה','ai');}
   }catch(e){
     typing.remove();
-    appendRoleMsg('שגיאה: '+e.message,'ai');
+    if(e.name!=='AbortError')appendRoleMsg('שגיאה: '+e.message,'ai');
+  }finally{
+    _rcaCtrl=null;
+    _rcaSetSending(false);
   }
 }
 

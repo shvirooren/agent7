@@ -861,7 +861,7 @@ var _TKF={success:{bg:'#DCFCE7',color:'#15803d',border:'#86EFAC',icon:'✓'},err
 function dbErr(r,msg){if(r&&r.error){toast(msg||'שגיאה: '+r.error.message,'error');return true;}return false;}
 
 function toast(msg,type,dur){
-  type=type||'info';dur=dur||1800;var k=_TKF[type]||_TKF.info;
+  type=type||'info';dur=dur||3200;var k=_TKF[type]||_TKF.info;
   var el=document.createElement('div');
   el.style.cssText='background:'+k.bg+';color:'+k.color+';border:1.5px solid '+k.border+';border-radius:8px;padding:10px 18px;font-size:13.5px;font-weight:600;font-family:Heebo,sans-serif;box-shadow:0 4px 20px rgba(0,0,0,.12);pointer-events:auto;max-width:380px;text-align:center;animation:a7TIn .25s cubic-bezier(.34,1.56,.64,1);direction:rtl;display:flex;align-items:center;gap:8px';
   el.innerHTML='<span>'+k.icon+'</span><span>'+esc(msg)+'</span>';

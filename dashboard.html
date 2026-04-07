@@ -3085,9 +3085,7 @@ function collectPermissions(){
 }
 
 function editAgentSetup(btn){
-  var roleId=btn.dataset.roleId;
-  sessionStorage.setItem('editRole', roleId);
-  window.location.href='agent-setup.html';
+  openAgentSettings(btn);
 }
 
 function openAgentSettings(btn){

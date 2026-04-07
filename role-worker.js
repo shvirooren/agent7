@@ -103,6 +103,19 @@ async function sbDeleteIds(env, table, ids) {
   if (!res.ok) throw new Error(`Supabase DELETE error: ${await res.text()}`);
 }
 
+async function sbDeleteWhere(env, table, params) {
+  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v));
+  const res = await fetch(url.toString(), {
+    method: 'DELETE',
+    headers: {
+      'apikey': env.SUPABASE_SERVICE_KEY,
+      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`
+    }
+  });
+  if (!res.ok) throw new Error(`Supabase DELETE error: ${await res.text()}`);
+}
+
 async function sbDelete(env, table, match) {
   const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
   Object.entries(match).forEach(([k, v]) => url.searchParams.set(k, `eq.${v}`));
@@ -352,7 +365,7 @@ async function handleRoleChat(request, env, cors) {
       const embedRes = await env.AI.run('@cf/baai/bge-m3', { text: [new_message] });
       const queryEmbedding = embedRes.data?.[0];
       if (queryEmbedding) {
-        const dynamicCount = new_message.length < 30 ? 4 : 8;
+        const dynamicCount = new_message.length < 30 ? 6 : 12;
         const chunks = await sbRpc(env, 'match_knowledge_chunks_hybrid', {
           query_embedding:      queryEmbedding,
           query_text:           new_message,
@@ -365,8 +378,8 @@ async function handleRoleChat(request, env, cors) {
           const formatted = chunks.map(c =>
             (c.source_filename ? `[${c.source_filename}]\n` : '') + c.content
           ).join('\n---\n');
-          // cap knowledge block at 3000 chars to limit token usage
-          knowledgeBlock = '\n\nבסיס ידע:\n' + formatted.slice(0, 3000);
+          // cap knowledge block at 12000 chars (~9000 tokens — fits comfortably in context)
+          knowledgeBlock = '\n\nבסיס ידע:\n' + formatted.slice(0, 12000);
         }
       }
     } catch (e) { /* RAG failed silently */ }
@@ -968,16 +981,27 @@ ${convText}${existingBlock}
 
   await sbInsert(env, 'role_agent_memory', inserts).catch(() => {});
 
-  // 5. Prune — keep top 60 by importance desc, created_at desc
+  // 5. Prune — first remove stale low-value memories, then cap at 50
   try {
+    const cutoff90  = new Date(Date.now() - 90  * 86400000).toISOString();
+    const cutoff180 = new Date(Date.now() - 180 * 86400000).toISOString();
+    // importance <= 2 older than 90 days
+    await sbDeleteWhere(env, 'role_agent_memory', {
+      agent_id: `eq.${agent_id}`, importance: 'lte.2', created_at: `lt.${cutoff90}`
+    });
+    // importance <= 3 older than 180 days
+    await sbDeleteWhere(env, 'role_agent_memory', {
+      agent_id: `eq.${agent_id}`, importance: 'lte.3', created_at: `lt.${cutoff180}`
+    });
+    // hard cap: keep top 50 by importance + recency
     const all = await sbGet(env, 'role_agent_memory', {
       select: 'id',
       agent_id,
       order: 'importance.desc,created_at.desc',
       limit: '200'
     });
-    if (all.length > 60) {
-      await sbDeleteIds(env, 'role_agent_memory', all.slice(60).map(m => m.id));
+    if (all.length > 50) {
+      await sbDeleteIds(env, 'role_agent_memory', all.slice(50).map(m => m.id));
     }
   } catch(e) {}
 

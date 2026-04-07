@@ -303,6 +303,14 @@ async function send() {
           fullReply += evt.t;
           bubble.textContent = fullReply;
           msgsEl.scrollTop = msgsEl.scrollHeight;
+        } else if (evt.action) {
+          streamDiv.remove();
+          var msg = evt.reply || 'המסמך מוכן.';
+          appendMsg(msg + ' 📄 [לחץ להורדה]', 'ai');
+          chatHistory.push({ role: 'assistant', content: msg });
+          if (evt.action.type === 'create_pdf') generatePDF(evt.action.data);
+          fullReply = msg;
+          break outer;
         } else if (evt.error) {
           streamDiv.remove();
           appendMsg(evt.error, 'ai');
@@ -323,6 +331,40 @@ async function send() {
     setSending(false);
     document.getElementById('inp').focus();
   }
+}
+
+function generatePDF(data) {
+  var sections = '';
+  (data.sections || []).forEach(function(s) {
+    if (s.heading) sections += '<h2>' + s.heading + '</h2>';
+    if (s.type === 'text') {
+      sections += '<p>' + (s.content || '').replace(/\n/g, '<br>') + '</p>';
+    } else if (s.type === 'table' && s.headers) {
+      sections += '<table><thead><tr>' + s.headers.map(function(h){ return '<th>' + h + '</th>'; }).join('') + '</tr></thead><tbody>';
+      (s.rows || []).forEach(function(row){ sections += '<tr>' + row.map(function(c){ return '<td>' + c + '</td>'; }).join('') + '</tr>'; });
+      sections += '</tbody></table>';
+    } else if (s.type === 'list') {
+      sections += '<ul>' + (s.items || []).map(function(i){ return '<li>' + i + '</li>'; }).join('') + '</ul>';
+    }
+  });
+  var html = '<!DOCTYPE html><html dir="rtl" lang="he"><head><meta charset="UTF-8"><title>' + (data.title || 'מסמך') + '</title><style>'
+    + 'body{font-family:Arial,sans-serif;direction:rtl;margin:40px;color:#1e293b}'
+    + 'h1{color:#003366;font-size:22px;margin-bottom:4px}'
+    + '.sub{color:#64748b;font-size:13px;margin-bottom:28px}'
+    + 'h2{color:#0055A4;font-size:15px;margin-top:24px;border-bottom:1px solid #e2e8f0;padding-bottom:6px}'
+    + 'p{line-height:1.7;font-size:13px}'
+    + 'table{width:100%;border-collapse:collapse;font-size:13px;margin-top:8px}'
+    + 'th{background:#003366;color:#fff;padding:8px 12px;text-align:right}'
+    + 'td{padding:7px 12px;border-bottom:1px solid #e2e8f0}'
+    + 'tr:nth-child(even) td{background:#f8fafc}'
+    + 'ul{margin:8px 0;padding-right:20px}'
+    + 'li{font-size:13px;line-height:1.7}'
+    + '</style></head><body>'
+    + '<h1>' + (data.title || '') + '</h1>'
+    + (data.subtitle ? '<div class="sub">' + data.subtitle + '</div>' : '')
+    + sections + '</body></html>';
+  var w = window.open('', '_blank');
+  if (w) { w.document.write(html); w.document.close(); setTimeout(function(){ w.print(); }, 400); }
 }
 
 function appendMsg(text, cls) {

@@ -279,14 +279,19 @@ async function send() {
           id:               role.id,
           title:            role.title,
           description:      role.description || '',
-          responsibilities: role.responsibilities || '',
+          responsibilities: (role.responsibilities || '') + (_chatEmpId && employeeTasksCtx ? '\n\n' + employeeTasksCtx : ''),
           system_prompt:    role.system_prompt || ''
         },
         memory:               agentMemory,
-        conversation_history: chatHistory.slice(-8),
+        conversation_history: (_chatEmpId && employeeTasksCtx
+          ? [{role:'user',content:'[נתוני מערכת - משימות העובד]\n'+employeeTasksCtx},{role:'assistant',content:'קיבלתי את רשימת המשימות של העובד ואשתמש בה.'}]
+          : []
+        ).concat(chatHistory.slice(-8)),
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
-        permissions:          CU.is_anonymous ? { tasks:{read:true,write:false}, employees:{read:true,write:false}, shipments:{read:true,write:false}, quotes:{read:true,write:false}, orders:{read:true,write:false} } : (role.permissions || {}),
+        permissions:          _chatEmpId
+          ? Object.assign({}, role.permissions || {}, { tasks: { read: true, write: (role.permissions||{}).tasks?.write || false } })
+          : CU.is_anonymous ? { tasks:{read:true,write:false}, employees:{read:true,write:false}, shipments:{read:true,write:false}, quotes:{read:true,write:false}, orders:{read:true,write:false} } : (role.permissions || {}),
         manager_id:           _chatMgrId || CU.id,
         employee_id:          _chatEmpId || undefined,
         stream:               true

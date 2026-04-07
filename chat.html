@@ -395,6 +395,8 @@ function goBack() {
     else if (ref.includes('employee')) back = 'employee.html';
     else if (ref.includes('agent-setup')) back = 'agent-setup.html';
   }
+  sessionStorage.removeItem('autoOpenRole');
+  sessionStorage.removeItem('chatBackUrl');
   window.location.href = back || 'dashboard.html';
 }
 

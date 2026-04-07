@@ -315,7 +315,7 @@ body{overflow-x:hidden}
     <a class="ni" data-id="quotes" href="#" onclick="sp('quotes');return false;"><span class="ic">💰</span> הצעות מחיר</a>
     <a class="ni" data-id="orders" href="#" onclick="sp('orders');return false;"><span class="ic">📦</span> הזמנות</a>
     <div class="nst">חשבון</div>
-    <a class="ni" data-id="chat" href="#" onclick="sp('chat');return false;"><span class="ic">💬</span> Agent 7 AI</a>
+    <a class="ni" data-id="chat" href="#" onclick="openManagerAgent();return false;"><span class="ic">💬</span> Agent 7 AI</a>
     <a class="ni" data-id="billing" href="#" onclick="sp('billing');return false;"><span class="ic">💳</span> מנוי</a>
   </nav>
   <div class="sfoot">
@@ -919,6 +919,47 @@ sb.auth.getSession().then(function(r){
 
 // Nav
 var TITLES={tasks:'משימות',employees:'עובדים',agents:'סוכנים',shipments:'משלוחים',quotes:'הצעות מחיר',orders:'הזמנות',chat:'Agent 7 AI',billing:'מנוי'};
+var MANAGER_AGENT_TITLE = 'Agent 7 AI';
+var MANAGER_FULL_PERMISSIONS = {
+  tasks:     { read: true, write: true },
+  employees: { read: true, write: true },
+  shipments: { read: true, write: true },
+  quotes:    { read: true, write: true },
+  orders:    { read: true, write: true }
+};
+
+async function openManagerAgent() {
+  if (!CU) return;
+  // Find or create the manager's personal agent
+  var res = await sb.from('job_roles')
+    .select('id')
+    .eq('user_id', CU.id)
+    .eq('title', MANAGER_AGENT_TITLE)
+    .maybeSingle();
+
+  var roleId = res.data && res.data.id;
+
+  if (!roleId) {
+    var ins = await sb.from('job_roles').insert({
+      user_id:         CU.id,
+      title:           MANAGER_AGENT_TITLE,
+      description:     'הסוכן האישי שלך — גישה מלאה לכל נתוני המערכת',
+      responsibilities:'ניהול משימות, עובדים, משלוחים, הצעות מחיר ויצירת מסמכים',
+      system_prompt:   'אתה Agent 7, העוזר האישי של המנהל. יש לך גישה מלאה לכל נתוני המערכת. אתה יכול ליצור ולעדכן משימות, לנהל עובדים, לעקוב אחר משלוחים, ולייצר מסמכים ודוחות. ענה תמיד בעברית, היה יוזם ומועיל.',
+      permissions:     MANAGER_FULL_PERMISSIONS
+    }).select('id').single();
+    if (ins.error) { toast('שגיאה ביצירת סוכן מנהל', 'error'); return; }
+    roleId = ins.data.id;
+  } else {
+    // Ensure permissions are always up to date
+    await sb.from('job_roles').update({ permissions: MANAGER_FULL_PERMISSIONS }).eq('id', roleId);
+  }
+
+  sessionStorage.setItem('autoOpenRole', roleId);
+  sessionStorage.setItem('chatBackUrl', 'dashboard.html');
+  window.location.href = 'chat.html';
+}
+
 function sp(id){
   document.querySelectorAll('.pg').forEach(function(p){p.classList.remove('on');});
   document.querySelectorAll('.ni').forEach(function(n){n.classList.remove('on');});

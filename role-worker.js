@@ -237,44 +237,92 @@ const WRITE_TOOLS = {
   shipments: [
     {
       name: 'update_shipment_status',
-      description: 'עדכן סטטוס של משלוח. השתמש כאשר המשתמש מבקש לשנות סטטוס של משלוח.',
+      description: 'עדכן סטטוס של משלוח.',
       input_schema: {
         type: 'object',
         properties: {
           shipment_id:  { type: 'string', description: 'מזהה המשלוח (id) מהרשימה' },
           status:       { type: 'string', enum: ['בדרך', 'עוכב', 'הגיע', 'נסגר'], description: 'הסטטוס החדש' },
-          description:  { type: 'string', description: 'תיאור קריא לאדם, לדוגמה: עדכון סטטוס משלוח LILY ל-הגיע' }
+          description:  { type: 'string', description: 'תיאור קריא לאדם' }
         },
         required: ['shipment_id', 'status', 'description']
+      }
+    },
+    {
+      name: 'create_shipment',
+      description: 'צור משלוח חדש.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          supplier:        { type: 'string', description: 'שם הספק' },
+          carrier:         { type: 'string', description: 'חברת השילוח' },
+          tracking_number: { type: 'string', description: 'מספר מעקב' },
+          origin_country:  { type: 'string', description: 'ארץ מוצא' },
+          destination:     { type: 'string', description: 'יעד' },
+          departure_date:  { type: 'string', description: 'תאריך יציאה (YYYY-MM-DD)' },
+          arrival_date:    { type: 'string', description: 'תאריך הגעה משוער (YYYY-MM-DD)' },
+          description:     { type: 'string', description: 'תיאור קריא לאדם' }
+        },
+        required: ['supplier', 'description']
       }
     }
   ],
   tasks: [
     {
       name: 'update_task_status',
-      description: 'עדכן סטטוס של משימה. השתמש כאשר המשתמש מבקש לסיים, להתחיל, או לסגור משימה.',
+      description: 'עדכן סטטוס של משימה.',
       input_schema: {
         type: 'object',
         properties: {
           task_id:     { type: 'string', description: 'מזהה המשימה (id) מהרשימה' },
           status:      { type: 'string', enum: ['פתוח', 'בביצוע', 'הושלם'], description: 'הסטטוס החדש' },
-          description: { type: 'string', description: 'תיאור קריא לאדם של הפעולה' }
+          description: { type: 'string', description: 'תיאור קריא לאדם' }
         },
         required: ['task_id', 'status', 'description']
       }
     },
     {
       name: 'create_task',
-      description: 'צור משימה חדשה. השתמש כאשר המשתמש מבקש ליצור משימה.',
+      description: 'צור משימה חדשה.',
       input_schema: {
         type: 'object',
         properties: {
           title:       { type: 'string', description: 'כותרת המשימה' },
           description: { type: 'string', description: 'תיאור המשימה (אופציונלי)' },
           priority:    { type: 'string', enum: ['רגיל', 'בינוני', 'דחוף'], description: 'עדיפות' },
-          readable_description: { type: 'string', description: 'תיאור קריא לאדם, לדוגמה: יצירת משימה: בדיקת מלאי' }
+          employee_id: { type: 'string', description: 'מזהה עובד לשיוך (אופציונלי)' },
+          readable_description: { type: 'string', description: 'תיאור קריא לאדם' }
         },
         required: ['title', 'readable_description']
+      }
+    },
+    {
+      name: 'delete_task',
+      description: 'מחק משימה.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          task_id:     { type: 'string', description: 'מזהה המשימה' },
+          description: { type: 'string', description: 'תיאור קריא לאדם' }
+        },
+        required: ['task_id', 'description']
+      }
+    }
+  ],
+  employees: [
+    {
+      name: 'create_employee',
+      description: 'צור עובד חדש במערכת.',
+      input_schema: {
+        type: 'object',
+        properties: {
+          name:        { type: 'string', description: 'שם העובד' },
+          email:       { type: 'string', description: 'אימייל העובד' },
+          department:  { type: 'string', description: 'מחלקה (אופציונלי)' },
+          role:        { type: 'string', description: 'תפקיד (אופציונלי)' },
+          description: { type: 'string', description: 'תיאור קריא לאדם' }
+        },
+        required: ['name', 'email', 'description']
       }
     }
   ]
@@ -283,8 +331,11 @@ const WRITE_TOOLS = {
 // Maps action_type → required permission
 const ACTION_PERMISSIONS = {
   update_shipment_status: { entity: 'shipments', op: 'write' },
+  create_shipment:        { entity: 'shipments', op: 'write' },
   update_task_status:     { entity: 'tasks',     op: 'write' },
-  create_task:            { entity: 'tasks',     op: 'write' }
+  create_task:            { entity: 'tasks',     op: 'write' },
+  delete_task:            { entity: 'tasks',     op: 'write' },
+  create_employee:        { entity: 'employees', op: 'write' }
 };
 
 // ─── POST /role-chat ──────────────────────────────────────────
@@ -605,7 +656,7 @@ async function handleRoleAction(request, env, cors) {
     case 'create_task': {
       await sbInsert(env, 'tasks', {
         user_id: manager_id,
-        employee_id: employee_id,
+        employee_id: params.employee_id || employee_id || null,
         title: params.title,
         description: params.description || '',
         priority: params.priority || 'רגיל',
@@ -614,6 +665,37 @@ async function handleRoleAction(request, env, cors) {
         updated_at: new Date().toISOString()
       });
       return jsonRes({ success: true, message: `משימה נוצרה: ${params.title}` }, cors);
+    }
+    case 'delete_task': {
+      await sbDelete(env, 'tasks', { id: params.task_id, user_id: manager_id });
+      return jsonRes({ success: true, message: 'המשימה נמחקה' }, cors);
+    }
+    case 'create_shipment': {
+      await sbInsert(env, 'shipments', {
+        manager_id: manager_id,
+        supplier: params.supplier || '',
+        carrier: params.carrier || '',
+        tracking_number: params.tracking_number || '',
+        origin_country: params.origin_country || '',
+        destination: params.destination || '',
+        departure_date: params.departure_date || null,
+        arrival_date: params.arrival_date || null,
+        status: 'בדרך',
+        created_at: new Date().toISOString()
+      });
+      return jsonRes({ success: true, message: `משלוח נוצר: ${params.supplier}` }, cors);
+    }
+    case 'create_employee': {
+      await sbInsert(env, 'employees', {
+        user_id: manager_id,
+        name: params.name,
+        email: params.email,
+        department: params.department || '',
+        role: params.role || '',
+        active: true,
+        created_at: new Date().toISOString()
+      });
+      return jsonRes({ success: true, message: `עובד נוצר: ${params.name}` }, cors);
     }
     default:
       return jsonRes({ error: 'פעולה לא ממומשת' }, cors, 400);

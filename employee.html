@@ -694,15 +694,11 @@ function loadRoleAgent(){
           if(cr.data)roleConvId=cr.data.id;
         });
       }
-      // טוען משימות העובד לקונטקסט
-      sb.from('tasks').select('title,description,status,priority').eq('employee_id',EMP_ID).order('created_at',{ascending:false}).limit(30).then(function(tr){
-        employeeTasks=tr.data||[];
-      });
     });
   });
 }
 
-function sendRoleMessage(){
+async function sendRoleMessage(){
   var input=document.getElementById('agent-input');
   var msg=input.value.trim();
   if(!msg||roleLoading)return;
@@ -726,12 +722,19 @@ function sendRoleMessage(){
   var cnEl=document.getElementById('company-name-text');
   if(cnEl)companyName=cnEl.textContent||'';
 
+  // שליפת משימות בזמן אמת
   var taskCtx='';
-  if(employeeTasks.length){
-    taskCtx='📋 המשימות שלי:\n'+employeeTasks.map(function(t){
-      var p=t.priority==='דחוף'?'🔴':t.priority==='בינוני'?'🟡':'🟢';
-      return '  '+p+' ['+t.status+'] '+t.title+(t.description?' — '+t.description.substring(0,80):'');
-    }).join('\n')+'\n';
+  if(EMP_ID){
+    try{
+      var tr=await sb.from('tasks').select('title,description,status,priority').eq('employee_id',EMP_ID).order('created_at',{ascending:false}).limit(30);
+      var tasks=tr.data||[];
+      if(tasks.length){
+        taskCtx='📋 המשימות של העובד:\n'+tasks.map(function(t){
+          var p=t.priority==='דחוף'?'🔴':t.priority==='בינוני'?'🟡':'🟢';
+          return '  '+p+' ['+t.status+'] '+t.title+(t.description?' — '+t.description.substring(0,80):'');
+        }).join('\n')+'\n';
+      }
+    }catch(e){}
   }
 
   var roleProfilePayload={

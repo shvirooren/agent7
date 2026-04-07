@@ -7,6 +7,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script>if(window.pdfjsLib)pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';</script>
 <style>
 :root{--bd:#003366;--bm:#0055A4;--bl:#0077CC;--ba:#009FE3;--bp:#E8F4FC;--gl:#F5F7FA;--gm:#E2E8EF;--gt:#5A6A7A;--w:#FFFFFF;--td:#1A2B3C;--gr:#16A34A;--gp:#DCFCE7;--rd:#DC2626;--rp:#FEE2E2;--or:#D97706;--op:#FEF3C7;--sw:224px}
@@ -525,17 +526,41 @@ body{overflow-x:hidden}
           <textarea class="fi" id="ags-systemprompt" rows="6" placeholder="אתה סוכן AI מקצועי. הטון שלך ידידותי ומקצועי. תמיד ענה בעברית. כשלקוח שואל על מחיר, הפנה אותו למנהל..."></textarea>
           <div class="fh">הוראות אלו עוצבות את אופי הסוכן — טון, גבולות, התנהגות</div>
         </div>
+        <!-- בסיס ידע: drag-drop + העלאת קבצים -->
+        <div style="margin-bottom:16px">
+          <label class="fl" style="margin-bottom:8px">בסיס ידע — העלאת קבצים</label>
+          <div id="ags-dropzone"
+            style="border:2px dashed var(--gm);border-radius:10px;padding:20px;text-align:center;cursor:pointer;transition:.2s;background:var(--gl)"
+            ondragover="agsDragOver(event)" ondragleave="agsDragLeave(event)" ondrop="agsDrop(event)"
+            onclick="document.getElementById('ags-file-input').click()">
+            <div style="font-size:28px;margin-bottom:6px">📂</div>
+            <div style="font-size:13px;font-weight:600;color:var(--bd);margin-bottom:4px">גרור קבצים לכאן או לחץ להעלאה</div>
+            <div style="font-size:11px;color:var(--gt)">
+              <span style="background:#e0f2fe;color:#0369a1;padding:2px 8px;border-radius:100px;font-weight:700;margin:0 3px">PDF</span>
+              <span style="background:#dcfce7;color:#15803d;padding:2px 8px;border-radius:100px;font-weight:700;margin:0 3px">Excel</span>
+              <span style="background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:100px;font-weight:700;margin:0 3px">TXT</span>
+              <span style="background:#f3f4f6;color:#374151;padding:2px 8px;border-radius:100px;font-weight:700;margin:0 3px">CSV</span>
+            </div>
+            <input type="file" id="ags-file-input" multiple accept=".txt,.csv,.md,.pdf,.xlsx,.xls" hidden onchange="agsFileSelect(event)">
+          </div>
+          <!-- קבצים בתור -->
+          <div id="ags-file-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+          <!-- כפתור אינדוקס -->
+          <div id="ags-index-wrap" style="display:none;margin-top:10px">
+            <button class="bsv" id="ags-index-btn" onclick="agsProcessFiles()" style="width:100%;font-size:13px">⚡ הוסף לבסיס הידע</button>
+            <div id="ags-index-status" style="font-size:12px;color:var(--gt);margin-top:6px;text-align:center"></div>
+          </div>
+        </div>
+        <!-- הדבקת טקסט ידנית -->
         <div class="fg" style="margin-bottom:6px">
-          <label class="fl">בסיס ידע ייעודי</label>
-          <textarea class="fi" id="ags-knowledge" rows="5" placeholder="הדבק כאן מידע שהסוכן צריך לדעת — רשימת מוצרים, נהלים, מחירים, שאלות נפוצות..." oninput="updateKbCounter()"></textarea>
+          <label class="fl">או הדבק טקסט ישירות</label>
+          <textarea class="fi" id="ags-knowledge" rows="4" placeholder="הדבק כאן מידע — רשימת מוצרים, נהלים, מחירים, שאלות נפוצות..." oninput="updateKbCounter()"></textarea>
           <div id="kb-char-counter" style="font-size:11px;color:var(--gt);text-align:left;margin-top:3px;direction:ltr">0 / 50,000 תווים</div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:20px">
-          <label style="background:var(--gl);border:1.5px dashed var(--gm);border-radius:6px;padding:7px 14px;font-size:12px;font-weight:600;color:var(--gt);cursor:pointer;transition:.15s" onmouseenter="this.style.borderColor='var(--bm)';this.style.color='var(--bm)'" onmouseleave="this.style.borderColor='var(--gm)';this.style.color='var(--gt)'">
-            📎 העלה קובץ טקסט
-            <input type="file" accept=".txt,.csv,.md" onchange="handleAgsFileUpload(this)" style="display:none">
-          </label>
-          <div id="ags-knowledge-status" style="font-size:12px;color:var(--gt)"></div>
+        <!-- קבצים קיימים בבסיס הידע -->
+        <div style="margin-bottom:16px">
+          <label class="fl" style="margin-bottom:8px">קבצים בבסיס הידע</label>
+          <div id="ags-existing-files"><div style="font-size:13px;color:var(--gt);padding:8px 0">טוען...</div></div>
         </div>
         <div style="margin-bottom:20px">
           <label class="fl" style="margin-bottom:10px">הרשאות גישה לנתוני המערכת</label>
@@ -3088,43 +3113,29 @@ function editAgentSetup(btn){
   openAgentSettings(btn);
 }
 
+var _agsFiles=[];
+
 function openAgentSettings(btn){
   var roleId=btn.dataset.roleId;
   var role=allRoles.find(function(r){return r.id===roleId;});
   if(!role)return;
   _agsRoleId=roleId;
+  _agsFiles=[];
   document.getElementById('ags-title').textContent='⚙️ הגדרות: '+role.title;
   document.getElementById('ags-systemprompt').value=role.system_prompt||'';
   document.getElementById('ags-knowledge').value='';
+  document.getElementById('kb-char-counter').textContent='0 / 50,000 תווים';
+  document.getElementById('ags-file-list').innerHTML='';
+  document.getElementById('ags-index-wrap').style.display='none';
+  document.getElementById('ags-index-status').textContent='';
   renderPermTable(role.permissions||{});
-  var st=document.getElementById('ags-knowledge-status');
-  st.textContent='טוען...'; st.style.color='var(--gt)';
   document.getElementById('agent-settings-modal').style.display='flex';
-  sb.from('role_knowledge_files').select('filename,chunk_count')
-    .eq('role_id',roleId).eq('manager_id',CU.id).then(function(r){
-      var kfiles=r.data||[];
-      if(kfiles.length){
-        var totalChunks=kfiles.reduce(function(s,f){return s+(f.chunk_count||0);},0);
-        st.textContent='✓ '+kfiles.length+' קבצים ('+totalChunks+' קטעי ידע) — להחלפה הדבק ידע חדש';
-        st.style.color='var(--gr)';
-      } else {
-        sb.from('role_knowledge_chunks').select('id',{count:'exact',head:true})
-          .eq('role_id',roleId).eq('manager_id',CU.id).then(function(cr){
-            if(cr.count){
-              st.textContent='✓ '+cr.count+' קטעי ידע';
-              st.style.color='var(--gr)';
-            } else {
-              st.textContent='אין בסיס ידע עדיין';
-              st.style.color='var(--gt)';
-            }
-          });
-      }
-    });
+  agsLoadKnowledgeFiles(roleId);
 }
 
 function closeAgentSettings(){
   document.getElementById('agent-settings-modal').style.display='none';
-  _agsRoleId=null;
+  _agsRoleId=null; _agsFiles=[];
 }
 
 function saveAgentSettings(){
@@ -3141,26 +3152,165 @@ function saveAgentSettings(){
     if(knowledge){
       btn.textContent='מאנדקס ידע...';
       fetch(ROLE_WORKER_URL+'/role-index',{
-        method:'POST',
-        headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:knowledge,filename:'הדבקה ידנית',append:false})
+        method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:knowledge,filename:'הדבקה ידנית',append:true})
       }).then(function(r){return r.json();}).then(function(d){
         toast('הגדרות נשמרו ✓ ('+(d.indexed||0)+' קטעי ידע עובדו)','success');
       }).catch(function(){
         toast('הגדרות נשמרו ✓ (אינדוקס ידע נכשל)','warning');
       }).finally(function(){
         btn.disabled=false; btn.textContent='שמור';
-        closeAgentSettings();
-        loadRoleAgents();
+        closeAgentSettings(); loadRoleAgents();
       });
     } else {
       btn.disabled=false; btn.textContent='שמור';
       toast('הגדרות נשמרו ✓','success');
-      closeAgentSettings();
-      loadRoleAgents();
+      closeAgentSettings(); loadRoleAgents();
     }
   });
 }
+
+// ── ידע: טעינת קבצים קיימים ──────────────────────────────────
+function agsLoadKnowledgeFiles(roleId){
+  var el=document.getElementById('ags-existing-files');
+  el.innerHTML='<div style="font-size:13px;color:var(--gt);padding:8px 0">טוען...</div>';
+  sb.from('role_knowledge_files').select('*').eq('role_id',roleId).eq('manager_id',CU.id)
+    .order('created_at',{ascending:false}).then(function(r){
+      var files=r.data||[];
+      if(!files.length){el.innerHTML='<div style="font-size:13px;color:var(--gt);padding:8px 0">אין קבצים בבסיס הידע עדיין</div>';return;}
+      el.innerHTML=files.map(function(f){
+        var icon=/\.pdf$/i.test(f.filename)?'📕':/\.(xlsx|xls)$/i.test(f.filename)?'📗':'📄';
+        var sz=agsFormatSize(f.file_size||0);
+        var chunks=f.chunk_count?' · '+f.chunk_count+' קטעים':'';
+        return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--gl);border-radius:8px;border:1px solid var(--gm)">'+
+          '<span style="font-size:18px">'+icon+'</span>'+
+          '<div style="flex:1;min-width:0"><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.filename)+'</div>'+
+          '<div style="font-size:11px;color:var(--gt)">'+sz+chunks+'</div></div>'+
+          '<button onclick="agsDeleteFile(\''+f.id+'\',\''+esc(f.filename).replace(/'/g,"\\'")+'\',\''+roleId+'\')" style="background:none;border:none;cursor:pointer;color:var(--rd);font-size:16px;padding:2px 6px" title="מחק">🗑</button>'+
+          '</div>';
+      }).join('');
+    });
+}
+
+function agsDeleteFile(fileId,filename,roleId){
+  if(!confirm('למחוק את "'+filename+'" מבסיס הידע?'))return;
+  sb.from('role_knowledge_chunks').delete().eq('role_id',roleId).eq('manager_id',CU.id).eq('source_filename',filename).then(function(){
+    sb.from('role_knowledge_files').delete().eq('id',fileId).then(function(){
+      toast('הקובץ נמחק','success');
+      agsLoadKnowledgeFiles(roleId);
+    });
+  });
+}
+
+// ── ידע: גרירה ← drag & drop ─────────────────────────────────
+function agsDragOver(e){e.preventDefault();document.getElementById('ags-dropzone').style.borderColor='var(--bm)';document.getElementById('ags-dropzone').style.background='#eff6ff';}
+function agsDragLeave(){document.getElementById('ags-dropzone').style.borderColor='var(--gm)';document.getElementById('ags-dropzone').style.background='var(--gl)';}
+function agsDrop(e){e.preventDefault();agsDragLeave();agsAddFiles(Array.from(e.dataTransfer.files));}
+function agsFileSelect(e){agsAddFiles(Array.from(e.target.files));e.target.value='';}
+
+function agsAddFiles(fileObjs){
+  fileObjs.forEach(function(f){
+    if(!/\.(txt|csv|md|pdf|xlsx|xls)$/i.test(f.name)){toast(f.name+' — סוג קובץ לא נתמך','error');return;}
+    if(_agsFiles.find(function(x){return x.name===f.name;}))return;
+    var entry={name:f.name,size:f.size,fileObj:f,content:null};
+    entry.readPromise=agsExtractText(f).then(function(t){entry.content=t;});
+    _agsFiles.push(entry);
+  });
+  agsRenderFileList();
+}
+
+function agsRenderFileList(){
+  var el=document.getElementById('ags-file-list');
+  if(!_agsFiles.length){el.innerHTML='';document.getElementById('ags-index-wrap').style.display='none';return;}
+  el.innerHTML=_agsFiles.map(function(f){
+    var icon=/\.pdf$/i.test(f.name)?'📕':/\.(xlsx|xls)$/i.test(f.name)?'📗':'📄';
+    return '<div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#eff6ff;border-radius:8px;border:1px solid #bfdbfe">'+
+      '<span style="font-size:16px">'+icon+'</span>'+
+      '<span style="flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(f.name)+'</span>'+
+      '<span style="font-size:11px;color:var(--gt)">'+agsFormatSize(f.size)+'</span>'+
+      '<button onclick="agsRemoveFile(\''+esc(f.name).replace(/'/g,"\\'")+'\');" style="background:none;border:none;cursor:pointer;color:var(--gt);font-size:16px;padding:0 4px">×</button>'+
+      '</div>';
+  }).join('');
+  document.getElementById('ags-index-wrap').style.display='block';
+}
+
+function agsRemoveFile(name){_agsFiles=_agsFiles.filter(function(f){return f.name!==name;});agsRenderFileList();}
+
+async function agsExtractText(file){
+  if(/\.pdf$/i.test(file.name)){
+    try{
+      var ab=await file.arrayBuffer();
+      var bytes=new Uint8Array(ab);
+      var binary='';
+      for(var i=0;i<bytes.byteLength;i++)binary+=String.fromCharCode(bytes[i]);
+      var b64=btoa(binary);
+      var res=await fetch(ROLE_WORKER_URL+'/role-extract-pdf',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({pdf_base64:b64})});
+      var data=await res.json();
+      if(!res.ok)throw new Error(data.error||'שגיאת שרת');
+      if(!data.text||!data.text.trim())throw new Error('לא נמצא טקסט בקובץ');
+      return data.text;
+    }catch(e){toast('שגיאת PDF: '+e.message,'error');return null;}
+  }
+  if(/\.(xlsx|xls)$/i.test(file.name)){
+    try{
+      var ab2=await file.arrayBuffer();
+      var wb=XLSX.read(ab2,{type:'array'});
+      var text2='';
+      wb.SheetNames.forEach(function(name){text2+='=== '+name+' ===\n'+XLSX.utils.sheet_to_csv(wb.Sheets[name])+'\n';});
+      return text2;
+    }catch(e){toast('שגיאת Excel: '+e.message,'error');return null;}
+  }
+  return new Promise(function(resolve){
+    var reader=new FileReader();
+    reader.onload=function(e){resolve(e.target.result);};
+    reader.onerror=function(){resolve(null);};
+    reader.readAsText(file);
+  });
+}
+
+async function agsProcessFiles(){
+  if(!_agsRoleId||!_agsFiles.length)return;
+  var btn=document.getElementById('ags-index-btn');
+  var st=document.getElementById('ags-index-status');
+  btn.disabled=true; btn.textContent='מעבד...'; st.textContent='';
+  await Promise.all(_agsFiles.map(function(f){return f.readPromise||Promise.resolve();}));
+  var indexed=0;
+  for(var i=0;i<_agsFiles.length;i++){
+    var f=_agsFiles[i];
+    if(!f.content){toast('לא ניתן לקרוא: '+f.name,'error');continue;}
+    st.textContent='מעלה '+f.name+'...';
+    var safeFilename=f.name.replace(/[^a-zA-Z0-9.\-_]/g,'_');
+    var storagePath=CU.id+'/'+_agsRoleId+'/'+safeFilename;
+    await sb.storage.from('role-knowledge').upload(storagePath,f.fileObj,{upsert:true});
+    await sb.from('role_knowledge_files').upsert({
+      role_id:_agsRoleId,manager_id:CU.id,filename:f.name,file_size:f.size,storage_path:storagePath
+    },{onConflict:'role_id,manager_id,filename'});
+    var BATCH=20000;
+    for(var bi=0;bi<f.content.length;bi+=BATCH){
+      try{
+        var res=await fetch(ROLE_WORKER_URL+'/role-index',{
+          method:'POST',headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({role_id:_agsRoleId,manager_id:CU.id,content:f.content.slice(bi,bi+BATCH),filename:f.name,append:!(bi===0&&i===0&&indexed===0)})
+        });
+        var d=await res.json();
+        indexed+=(d.indexed||0);
+      }catch(e){toast('שגיאה באינדוקס '+f.name+': '+e.message,'error');}
+    }
+  }
+  btn.disabled=false; btn.textContent='⚡ הוסף לבסיס הידע';
+  if(indexed>0){
+    toast('✓ '+indexed+' קטעי ידע נוספו!','success');
+    _agsFiles=[];
+    document.getElementById('ags-file-list').innerHTML='';
+    document.getElementById('ags-index-wrap').style.display='none';
+    st.textContent='';
+    agsLoadKnowledgeFiles(_agsRoleId);
+  } else {
+    st.textContent='לא הצלחנו לאנדקס את המידע';
+  }
+}
+
+function agsFormatSize(b){if(b<1024)return b+'B';if(b<1048576)return Math.round(b/1024)+'KB';return (b/1048576).toFixed(1)+'MB';}
 
 // ── Knowledge base per role (stored in role_knowledge table) ──
 function loadRoleKnowledge(roleId,cb){
@@ -3176,25 +3326,6 @@ function saveRoleKnowledge(roleId,content,cb){
   });
 }
 
-function handleAgsFileUpload(input){
-  var file=input.files[0];
-  if(!file)return;
-  var st=document.getElementById('ags-knowledge-status');
-  if(!file.name.match(/\.(txt|csv|md)$/i)){
-    st.textContent='רק קבצי .txt / .csv / .md נתמכים';
-    st.style.color='var(--rd)'; return;
-  }
-  st.textContent='קורא קובץ...'; st.style.color='var(--or)';
-  var reader=new FileReader();
-  reader.onload=function(e){
-    document.getElementById('ags-knowledge').value=e.target.result;
-    updateKbCounter();
-    st.textContent='✓ '+file.name+' נטען ('+e.target.result.length.toLocaleString()+' תווים)';
-    st.style.color='var(--gr)';
-  };
-  reader.onerror=function(){st.textContent='שגיאה בקריאת הקובץ';st.style.color='var(--rd)';};
-  reader.readAsText(file);
-}
 
 function updateKbCounter() {
   var ta=document.getElementById('ags-knowledge');

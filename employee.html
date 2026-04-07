@@ -142,14 +142,14 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
 .agent-chat-sub{font-size:12px;color:#93c5fd;margin-top:2px}
 .chat-messages{flex:1;overflow-y:auto;padding:18px;display:flex;flex-direction:column;gap:14px;background:#fff}
 .cmsg{display:flex;gap:8px;max-width:80%}
-.cmsg.user{align-self:flex-start;flex-direction:row-reverse}
-.cmsg.assistant{align-self:flex-end}
+.cmsg.user{align-self:flex-end;flex-direction:row-reverse}
+.cmsg.assistant{align-self:flex-start}
 .cmsg-av{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
 .cmsg.user .cmsg-av{background:var(--gm)}
 .cmsg.assistant .cmsg-av{background:linear-gradient(135deg,var(--bm),var(--ba))}
 .cmsg-bubble{padding:10px 14px;border-radius:12px;font-size:14px;line-height:1.6}
-.cmsg.user .cmsg-bubble{background:#fff;color:var(--td);border-bottom-right-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
-.cmsg.assistant .cmsg-bubble{background:var(--bm);color:#fff;border-bottom-left-radius:3px}
+.cmsg.user .cmsg-bubble{background:#fff;color:var(--td);border-bottom-left-radius:3px;box-shadow:0 1px 4px rgba(0,0,0,.07)}
+.cmsg.assistant .cmsg-bubble{background:var(--bm);color:#fff;border-bottom-right-radius:3px}
 .chat-input-row{display:flex;gap:8px;padding:14px 18px;background:#fff;border-top:1px solid var(--gm);flex-shrink:0;align-items:flex-end}
 #agent-input{flex:1;padding:10px 14px;border:1.5px solid var(--gm);border-radius:10px;font-family:'Heebo',sans-serif;font-size:14px;outline:none;resize:none;max-height:100px;transition:border-color .2s;color:var(--td);unicode-bidi:plaintext;text-align:start}
 #agent-input:focus{border-color:var(--ba)}
@@ -157,7 +157,7 @@ body{font-family:'Heebo',sans-serif;background:var(--gl);color:var(--td);min-hei
 .chat-send-btn:hover{background:var(--bd)}
 .chat-send-btn:disabled{background:var(--gm);cursor:not-allowed}
 .chat-welcome{text-align:center;padding:40px 20px;color:var(--gt)}
-.typing-dots{display:none;align-self:flex-end;padding:10px 14px;background:var(--bm);border-radius:12px;border-bottom-left-radius:3px}
+.typing-dots{display:none;align-self:flex-start;padding:10px 14px;background:var(--bm);border-radius:12px;border-bottom-right-radius:3px}
 .typing-dots.show{display:flex;gap:5px}
 .typing-dot{width:6px;height:6px;background:rgba(255,255,255,.6);border-radius:50%;animation:tdot 1.2s infinite}
 .typing-dot:nth-child(2){animation-delay:.2s}

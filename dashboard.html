@@ -2896,7 +2896,8 @@ function openAssignModal(btn){
   document.getElementById('assign-role-modal').style.display='flex';
   function populateAssignSelect(){
     var sel=document.getElementById('assign-role-select');
-    sel.innerHTML='<option value="">ללא שיוך (הסר סוכן)</option>'+allRoles.map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.title)+'</option>';}).join('');
+    var assignableRoles=allRoles.filter(function(r){return r.title!==MANAGER_AGENT_TITLE;});
+    sel.innerHTML='<option value="">ללא שיוך (הסר סוכן)</option>'+assignableRoles.map(function(r){return '<option value="'+esc(r.id)+'">'+esc(r.title)+'</option>';}).join('');
     var emp=allEmployees.find(function(e){return e.id===empId;});
     if(emp&&emp.role_id)sel.value=emp.role_id;
   }

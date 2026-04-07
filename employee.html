@@ -351,7 +351,7 @@ function skeletonCards(n){
 // ═══════════════════════════
 //  STATE
 // ═══════════════════════════
-var CU=null, EMP_ID=null, MANAGER_ID=null, SESSION_JWT=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null;
+var CU=null, EMP_ID=null, MANAGER_ID=null, SESSION_JWT=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null, employeeTasks=[];
 var pendingStatusUpdate={}, pendingStatusTimer={};  // taskId → true  (debounce double-clicks)
 
 // ── Greeting ──
@@ -694,7 +694,10 @@ function loadRoleAgent(){
           if(cr.data)roleConvId=cr.data.id;
         });
       }
-      // knowledge נטען ב-RAG בצד השרת — אין צורך לטעון כאן
+      // טוען משימות העובד לקונטקסט
+      sb.from('tasks').select('title,description,status,priority').eq('employee_id',EMP_ID).order('created_at',{ascending:false}).limit(30).then(function(tr){
+        employeeTasks=tr.data||[];
+      });
     });
   });
 }
@@ -723,12 +726,20 @@ function sendRoleMessage(){
   var cnEl=document.getElementById('company-name-text');
   if(cnEl)companyName=cnEl.textContent||'';
 
+  var taskCtx='';
+  if(employeeTasks.length){
+    taskCtx='📋 המשימות שלי:\n'+employeeTasks.map(function(t){
+      var p=t.priority==='דחוף'?'🔴':t.priority==='בינוני'?'🟡':'🟢';
+      return '  '+p+' ['+t.status+'] '+t.title+(t.description?' — '+t.description.substring(0,80):'');
+    }).join('\n')+'\n';
+  }
+
   var roleProfilePayload={
     id:roleProfile.id,
     title:roleProfile.title,
     description:roleProfile.description||'',
     responsibilities:roleProfile.responsibilities||'',
-    system_prompt:roleProfile.system_prompt||'',
+    system_prompt:(roleProfile.system_prompt||'')+(taskCtx?'\n\n'+taskCtx:''),
     company_name:companyName
   };
 

@@ -451,7 +451,7 @@ body{overflow-x:hidden}
       <div class="card" style="margin-bottom:16px">
         <div class="ch">
           <div class="ct">סוכני AI לפי תפקיד</div>
-          <button class="bsv" onclick="window.location.href='agent-setup.html'" style="font-size:13px;padding:7px 14px">🚀 הגדר סוכן חדש</button>
+          <button class="bsv" onclick="openCreateAgentModal()" style="font-size:13px;padding:7px 14px">+ סוכן חדש</button>
         </div>
         <div class="cb">
           <!-- רשימת סוכנים -->
@@ -482,6 +482,33 @@ body{overflow-x:hidden}
         <div style="display:flex;gap:8px">
           <button class="bsv" onclick="confirmAssignRole()">שמור שיוך</button>
           <button class="bot" onclick="closeAssignModal()">ביטול</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- מודל: יצירת סוכן חדש -->
+    <div id="create-agent-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:300;align-items:center;justify-content:center">
+      <div style="background:#fff;border-radius:14px;padding:28px;width:100%;max-width:520px;margin:16px;direction:rtl;max-height:90vh;overflow-y:auto;box-shadow:0 24px 80px rgba(0,0,0,.25)">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+          <div style="font-size:16px;font-weight:800;color:var(--bd)">יצירת סוכן חדש</div>
+          <button onclick="closeCreateAgentModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:var(--gt)">✕</button>
+        </div>
+        <div class="fg" style="margin-bottom:16px">
+          <label class="fl">שם הסוכן / תפקיד <span style="color:var(--rd)">*</span></label>
+          <input class="fi" id="ca-title" type="text" placeholder="לדוגמה: נציג שירות לקוחות, סוכן מכירות...">
+        </div>
+        <div class="fg" style="margin-bottom:16px">
+          <label class="fl">תיאור קצר</label>
+          <input class="fi" id="ca-desc" type="text" placeholder="במה הסוכן עוזר?">
+        </div>
+        <div class="fg" style="margin-bottom:20px">
+          <label class="fl">הוראות לסוכן (System Prompt)</label>
+          <textarea class="fi" id="ca-systemprompt" rows="5" placeholder="אתה סוכן AI מקצועי. תמיד ענה בעברית. הטון שלך ידידותי ומקצועי..."></textarea>
+          <div class="fh">הוראות אלו עוצבות את אופי הסוכן — טון, גבולות, התנהגות</div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="bsv" id="ca-save-btn" onclick="createNewAgent()">צור סוכן</button>
+          <button class="bot" onclick="closeCreateAgentModal()">ביטול</button>
         </div>
       </div>
     </div>
@@ -2593,6 +2620,33 @@ function loadRoleAgents(){
         if(btn)openRoleChat(btn);
       }
     });
+  });
+}
+
+// מודל יצירת סוכן חדש
+function openCreateAgentModal(){
+  document.getElementById('ca-title').value='';
+  document.getElementById('ca-desc').value='';
+  document.getElementById('ca-systemprompt').value='';
+  document.getElementById('create-agent-modal').style.display='flex';
+  setTimeout(function(){document.getElementById('ca-title').focus();},50);
+}
+function closeCreateAgentModal(){
+  document.getElementById('create-agent-modal').style.display='none';
+}
+function createNewAgent(){
+  var title=document.getElementById('ca-title').value.trim();
+  var desc=document.getElementById('ca-desc').value.trim();
+  var sysp=document.getElementById('ca-systemprompt').value.trim();
+  if(!title){toast('נא להזין שם לסוכן','warning');return;}
+  var btn=document.getElementById('ca-save-btn');
+  btn.disabled=true; btn.textContent='יוצר...';
+  sb.from('job_roles').insert({user_id:CU.id,title:title,description:desc,system_prompt:sysp}).select('id').single().then(function(r){
+    btn.disabled=false; btn.textContent='צור סוכן';
+    if(r.error){toast('שגיאה: '+r.error.message,'error');return;}
+    closeCreateAgentModal();
+    toast('הסוכן נוצר בהצלחה!','success');
+    loadRoleAgents();
   });
 }
 

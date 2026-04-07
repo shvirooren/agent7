@@ -59,9 +59,22 @@ var sb = supabase.createClient(SURL, SKEY);
 
 (async function() {
   try {
-    // אם כבר יש session — קפוץ ישר
+    // אם כבר יש session — בדוק סוג משתמש
     var { data: { session } } = await sb.auth.getSession();
-    if (session) { window.location.href = 'agent-setup.html'; return; }
+    if (session) {
+      // מנהל אמיתי (לא אנונימי) → שלח לדשבורד
+      if (!session.user.is_anonymous) { window.location.href = 'dashboard.html'; return; }
+      // אנונימי עם סוכן קיים → שלח ישר לצ'אט
+      var { data: roles } = await sb.from('job_roles').select('id').eq('user_id', session.user.id).limit(1);
+      if (roles && roles.length > 0) {
+        sessionStorage.setItem('autoOpenRole', roles[0].id);
+        sessionStorage.setItem('chatBackUrl', 'agent-setup.html');
+        window.location.href = 'chat.html';
+      } else {
+        window.location.href = 'agent-setup.html';
+      }
+      return;
+    }
 
     // כניסה אנונימית — ללא שם/סיסמה
     var { data, error } = await sb.auth.signInAnonymously();

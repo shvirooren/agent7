@@ -200,14 +200,20 @@ function setSending(on) {
     document.getElementById('inp').focus();
     showSuggestions();
     if (!CU.is_anonymous) initMemory();
+    // Try URL params first, then sessionStorage, then auto-detect from DB
     var urlParams = new URLSearchParams(window.location.search);
     var empId = urlParams.get('emp') || sessionStorage.getItem('chatEmployeeId');
     var mgrId = urlParams.get('mgr') || sessionStorage.getItem('chatManagerId');
+    sessionStorage.removeItem('chatEmployeeId');
+    sessionStorage.removeItem('chatManagerId');
+    if (!empId && !CU.is_anonymous) {
+      // Auto-detect: check if this user is an employee
+      var euRes = await sb.from('employee_users').select('employee_id,manager_id').eq('auth_user_id', CU.id).maybeSingle();
+      if (euRes.data) { empId = euRes.data.employee_id; mgrId = euRes.data.manager_id; }
+    }
     if (empId) {
       _chatEmpId = empId;
       if (mgrId) _chatMgrId = mgrId;
-      sessionStorage.removeItem('chatEmployeeId');
-      sessionStorage.removeItem('chatManagerId');
       await loadEmployeeTasks(empId);
     }
   } catch(e) {

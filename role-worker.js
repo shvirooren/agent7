@@ -183,21 +183,6 @@ async function sbInsert(env, table, data) {
   if (!res.ok) throw new Error(`Supabase INSERT error: ${await res.text()}`);
 }
 
-async function sbUpsert(env, table, data, onConflict) {
-  const url = new URL(`${env.SUPABASE_URL.trim()}/rest/v1/${table}`);
-  url.searchParams.set('on_conflict', onConflict);
-  const res = await fetch(url.toString(), {
-    method: 'POST',
-    headers: {
-      'apikey': env.SUPABASE_SERVICE_KEY,
-      'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'resolution=merge-duplicates,return=minimal'
-    },
-    body: JSON.stringify(data)
-  });
-  if (!res.ok) throw new Error(`Supabase UPSERT error: ${await res.text()}`);
-}
 
 async function verifyJwt(env, jwt) {
   const url = `${env.SUPABASE_URL.trim()}/auth/v1/user`;
@@ -1018,6 +1003,3 @@ ${convText}${existingBlock}
 
   return jsonRes({ saved: inserts.length }, cors);
 }
-
-
-// redeploy with secrets

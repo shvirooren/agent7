@@ -307,7 +307,7 @@ async function send() {
           streamDiv.remove();
           firstToken = false;
           var msg = evt.reply || 'המסמך מוכן.';
-          appendMsg(msg + ' 📄 [לחץ להורדה]', 'ai');
+          appendMsg(msg + ' 📄', 'ai');
           chatHistory.push({ role: 'assistant', content: msg });
           if (evt.action.type === 'create_pdf') generatePDF(evt.action.data);
           fullReply = msg;

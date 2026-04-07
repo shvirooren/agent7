@@ -2884,7 +2884,7 @@ async function sendRoleMsg(){
           typing.remove();
           firstToken=false;
           var msg=evt.reply||'המסמך מוכן.';
-          appendRoleMsg(msg+' 📄 [לחץ להורדה]','ai');
+          appendRoleMsg(msg+' 📄','ai');
           _rcaHistory.push({role:'assistant',content:msg});
           if(evt.action.type==='create_pdf')generatePDF(evt.action.data);
           fullReply=msg;break outer;

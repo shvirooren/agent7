@@ -48,7 +48,7 @@ async function claude(env, system, messages, max_tokens = 1024) {
       'x-api-key': env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens, system, messages })
+    body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens, system, messages })
   });
   const data = await res.json();
   if (!res.ok) throw new Error(data.error?.message || 'Claude API error');
@@ -504,7 +504,7 @@ async function handleRoleChat(request, env, cors) {
       'x-api-key': env.ANTHROPIC_API_KEY,
       'anthropic-version': '2023-06-01'
     },
-    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2048, system, tools, messages })
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 1500, system, tools, messages })
   });
 
   const data = await res.json();

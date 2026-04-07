@@ -465,6 +465,24 @@ var PERM_ENTITIES = [
   if (CU.is_anonymous) document.querySelector('.back-btn').style.display = 'none';
   renderPermTable({});
   await loadExistingRoles();
+
+  if (CU.is_anonymous) {
+    // הסתר toggle — דמו לא בוחר מצב
+    document.querySelector('.toggle').style.display = 'none';
+    if (allRolesData.length > 0) {
+      // יש סוכן קיים → עבור ישר למצב עריכה
+      setMode('existing');
+      document.getElementById('existing-role').value = allRolesData[0].id;
+      await loadExistingRoleData();
+      document.getElementById('s1').querySelector('.card-head-sub').textContent = 'ערוך את הסוכן שלך';
+    } else {
+      // אין סוכן → מצב יצירה בלבד
+      setMode('new');
+      document.getElementById('s1').querySelector('.card-head-sub').textContent = 'צור את הסוכן שלך';
+    }
+    return;
+  }
+
   var editRoleId = sessionStorage.getItem('editRole');
   if (editRoleId) {
     sessionStorage.removeItem('editRole');

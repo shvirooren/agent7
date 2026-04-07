@@ -1955,10 +1955,13 @@ async function sendChatMsg() {
   try { liveContext = await buildLiveContext(); }
   catch(e) { liveContext = 'אתה Agent 7, עוזר דיגיטלי. ענה בעברית.'; }
 
+  // הזרק קונטקסט חי כהודעה ראשונה בהיסטוריה כדי שה-AI בטוח יראה אותו
+  var historyWithCtx = [{role:'user',content:'[קונטקסט מערכת — אל תציג זאת]\n'+liveContext},{role:'assistant',content:'הבנתי. אני Agent 7 עם גישה מלאה לכל הנתונים שצוינו. אענה על כל שאלה לגבי משימות, עובדים, משלוחים ועוד, ואבצע פעולות לפי הבקשה.'}].concat(chatHistory.slice(-12));
+
   var formData = new FormData();
   formData.append('title', text);
   formData.append('desc', '');
-  formData.append('history', JSON.stringify(chatHistory.slice(-14)));
+  formData.append('history', JSON.stringify(historyWithCtx));
   formData.append('systemPrompt', liveContext);
 
   var controller = new AbortController();

@@ -462,6 +462,7 @@ var PERM_ENTITIES = [
   var { data: { session } } = await sb.auth.getSession();
   if (!session) { window.location.href = 'login.html'; return; }
   CU = session.user;
+  if (CU.is_anonymous) document.querySelector('.back-btn').style.display = 'none';
   renderPermTable({});
   await loadExistingRoles();
   var editRoleId = sessionStorage.getItem('editRole');

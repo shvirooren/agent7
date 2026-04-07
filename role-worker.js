@@ -290,7 +290,7 @@ const ACTION_PERMISSIONS = {
 // ─── POST /role-chat ──────────────────────────────────────────
 
 async function handleRoleChat(request, env, cors) {
-  const { role_profile, memory, conversation_history, new_message, today, permissions, manager_id } = await request.json();
+  const { role_profile, memory, conversation_history, new_message, today, permissions, manager_id, stream } = await request.json();
 
   if (!new_message) return jsonRes({ error: 'new_message is required' }, cors, 400);
 
@@ -431,6 +431,8 @@ async function handleRoleChat(request, env, cors) {
     { role: 'user', content: new_message }
   ];
 
+  if (stream) return streamRoleChat(env, cors, system, tools, messages);
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -447,14 +449,12 @@ async function handleRoleChat(request, env, cors) {
   if (data.stop_reason === 'tool_use') {
     const toolUse = data.content.find(c => c.type === 'tool_use');
     if (toolUse) {
-      // PDF tool
       if (toolUse.name === 'create_pdf') {
         return jsonRes({
           reply: toolUse.input.message || 'המסמך מוכן.',
           action: { type: 'create_pdf', data: toolUse.input }
         }, cors);
       }
-      // DB write tool — return for client confirmation
       const textContent = data.content.find(c => c.type === 'text');
       return jsonRes({
         reply: textContent?.text || 'מצאתי את הפעולה הנדרשת. אנא אשר.',
@@ -469,6 +469,84 @@ async function handleRoleChat(request, env, cors) {
 
   const reply = data.content.find(c => c.type === 'text')?.text || '';
   return jsonRes({ reply }, cors);
+}
+
+// ─── Streaming handler ────────────────────────────────────────
+
+async function streamRoleChat(env, cors, system, tools, messages) {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': env.ANTHROPIC_API_KEY,
+      'anthropic-version': '2023-06-01'
+    },
+    body: JSON.stringify({ model: 'claude-sonnet-4-6', max_tokens: 2048, system, tools, messages, stream: true })
+  });
+
+  if (!res.ok) {
+    const data = await res.json();
+    throw new Error(data.error?.message || 'Claude API error');
+  }
+
+  const { readable, writable } = new TransformStream();
+  const writer = writable.getWriter();
+  const enc = new TextEncoder();
+
+  (async () => {
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = '';
+    let toolBlock = null;
+
+    const send = async (obj) => writer.write(enc.encode('data: ' + JSON.stringify(obj) + '\n\n'));
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop() || '';
+
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const raw = line.slice(6);
+          if (raw === '[DONE]') continue;
+          let evt;
+          try { evt = JSON.parse(raw); } catch { continue; }
+
+          if (evt.type === 'content_block_delta' && evt.delta?.type === 'text_delta') {
+            await send({ t: evt.delta.text });
+          } else if (evt.type === 'content_block_start' && evt.content_block?.type === 'tool_use') {
+            toolBlock = { name: evt.content_block.name, json: '' };
+          } else if (evt.type === 'content_block_delta' && evt.delta?.type === 'input_json_delta' && toolBlock) {
+            toolBlock.json += evt.delta.partial_json;
+          } else if (evt.type === 'message_stop') {
+            if (toolBlock) {
+              try {
+                const input = JSON.parse(toolBlock.json);
+                if (toolBlock.name === 'create_pdf') {
+                  await send({ action: { type: 'create_pdf', data: input }, reply: input.message || 'המסמך מוכן.' });
+                } else {
+                  await send({ db_action: { type: toolBlock.name, params: input, description: input.description || toolBlock.name } });
+                }
+              } catch {}
+            }
+            await writer.write(enc.encode('data: [DONE]\n\n'));
+          }
+        }
+      }
+    } catch (e) {
+      try { await send({ error: e.message }); } catch {}
+    } finally {
+      try { await writer.close(); } catch {}
+    }
+  })();
+
+  return new Response(readable, {
+    headers: { ...cors, 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' }
+  });
 }
 
 // ─── POST /role-action ────────────────────────────────────────

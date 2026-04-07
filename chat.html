@@ -237,8 +237,11 @@ async function send() {
   hideSuggestions();
 
   appendMsg(text, 'user');
+  chatHistory.push({ role: 'user', content: text });
 
-  var typing = appendMsg('חושב...', 'ai typing');
+  var streamDiv = appendMsg('חושב...', 'ai typing');
+  var bubble = streamDiv.querySelector('.bubble');
+  var firstToken = true;
   document.getElementById('send-btn').disabled = true;
 
   try {
@@ -261,18 +264,50 @@ async function send() {
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
         permissions:          role.permissions || {},
-        manager_id:           CU.id
+        manager_id:           CU.id,
+        stream:               true
       })
     });
     clearTimeout(timeout);
-    var data = await r.json();
-    typing.remove();
-    var reply = (data.reply || data.error || 'שגיאה').trim();
-    appendMsg(reply, 'ai');
-    chatHistory.push({ role: 'user', content: text });
-    chatHistory.push({ role: 'assistant', content: reply });
+
+    var reader = r.body.getReader();
+    var decoder = new TextDecoder();
+    var buf = '';
+    var fullReply = '';
+    var msgsEl = document.getElementById('msgs');
+
+    outer: while (true) {
+      var chunk = await reader.read();
+      if (chunk.done) break;
+      buf += decoder.decode(chunk.value, { stream: true });
+      var lines = buf.split('\n');
+      buf = lines.pop() || '';
+      for (var i = 0; i < lines.length; i++) {
+        var line = lines[i];
+        if (!line.startsWith('data: ')) continue;
+        var raw = line.slice(6);
+        if (raw === '[DONE]') break outer;
+        var evt;
+        try { evt = JSON.parse(raw); } catch(e) { continue; }
+        if (evt.t) {
+          if (firstToken) { streamDiv.className = 'msg ai'; bubble.textContent = ''; firstToken = false; }
+          fullReply += evt.t;
+          bubble.textContent = fullReply;
+          msgsEl.scrollTop = msgsEl.scrollHeight;
+        } else if (evt.error) {
+          streamDiv.remove();
+          appendMsg(evt.error, 'ai');
+          fullReply = '';
+          break outer;
+        }
+      }
+    }
+
+    if (fullReply) chatHistory.push({ role: 'assistant', content: fullReply });
+    if (firstToken) { streamDiv.remove(); appendMsg('שגיאה בקבלת תשובה', 'ai'); }
+
   } catch(e) {
-    typing.remove();
+    streamDiv.remove();
     if (e.name === 'AbortError') {
       appendMsg('פג תוקף — הסוכן לא ענה בזמן. נסה שוב.', 'ai');
     } else {

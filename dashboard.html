@@ -2819,6 +2819,8 @@ async function sendRoleMsg(){
     .order('importance',{ascending:false}).limit(8);
   var memory=memRes.data||[];
 
+  var rcaBubble=typing.children[1];
+  var firstToken=true;
   try{
     var r=await fetch(ROLE_WORKER_URL+'/role-chat',{
       method:'POST',
@@ -2836,14 +2838,44 @@ async function sendRoleMsg(){
         new_message:          text,
         today:                new Date().toLocaleDateString('he-IL'),
         permissions:          role.permissions||{},
-        manager_id:           CU.id
+        manager_id:           CU.id,
+        stream:               true
       })
     });
-    var data=await r.json();
-    typing.remove();
-    var reply=(data.reply||data.error||'שגיאה בקבלת תשובה').trim();
-    appendRoleMsg(reply,'ai');
-    _rcaHistory.push({role:'assistant',content:reply});
+
+    var reader=r.body.getReader();
+    var decoder=new TextDecoder();
+    var buf='';
+    var fullReply='';
+    var box=document.getElementById('rca-messages');
+
+    outer: while(true){
+      var chunk=await reader.read();
+      if(chunk.done)break;
+      buf+=decoder.decode(chunk.value,{stream:true});
+      var lines=buf.split('\n');
+      buf=lines.pop()||'';
+      for(var i=0;i<lines.length;i++){
+        var line=lines[i];
+        if(!line.startsWith('data: '))continue;
+        var raw=line.slice(6);
+        if(raw==='[DONE]')break outer;
+        var evt;try{evt=JSON.parse(raw);}catch(e){continue;}
+        if(evt.t){
+          if(firstToken){rcaBubble.textContent='';firstToken=false;}
+          fullReply+=evt.t;
+          rcaBubble.textContent=fullReply;
+          box.scrollTop=box.scrollHeight;
+        }else if(evt.error){
+          typing.remove();
+          appendRoleMsg(evt.error,'ai');
+          fullReply='';break outer;
+        }
+      }
+    }
+
+    if(fullReply)_rcaHistory.push({role:'assistant',content:fullReply});
+    if(firstToken){typing.remove();appendRoleMsg('שגיאה בקבלת תשובה','ai');}
   }catch(e){
     typing.remove();
     appendRoleMsg('שגיאה: '+e.message,'ai');

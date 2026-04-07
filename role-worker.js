@@ -470,6 +470,8 @@ async function handleRoleChat(request, env, cors) {
     ? '\n- כשהמשתמש מבקש לעדכן נתונים (סטטוס משלוח, משימה וכו\') — השתמש בכלי המתאים. אל תאמר שאתה מבצע פעולה בטקסט בלבד.'
     : '';
 
+  const taskInstruction = '\n- אם רשימת משימות מופיעה בהקשר (באחריות, בנתונים עדכניים, או בשיחה) — ענה ישירות מהנתונים האלה. אין צורך בכלי לקריאת משימות — הנתונים כבר נטענו עבורך.';
+
   const system = `אתה סוכן AI מקצועי של תפקיד "${role_profile.title}" בחברת "${role_profile.company_name}".
 
 תיאור התפקיד: ${role_profile.description || 'לא צוין'}
@@ -479,7 +481,7 @@ async function handleRoleChat(request, env, cors) {
 - ענה תמיד בעברית אלא אם מבקשים אחרת.
 - היה ממוקד, מקצועי ומועיל.
 - אם אין לך מידע, אמור זאת בכנות.
-- כשמישהו מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה או מסמך — השתמש בכלי create_pdf.${writeInstruction}
+- כשמישהו מבקש PDF, הצעת מחיר, דוח, סיכום, חוזה או מסמך — השתמש בכלי create_pdf.${writeInstruction}${taskInstruction}
 - התאריך של היום הוא: ${today || new Date().toLocaleDateString('he-IL')}.`;
 
   const messages = [

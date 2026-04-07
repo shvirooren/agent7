@@ -425,13 +425,15 @@ async function loadEmployeeTasks(empId) {
   try {
     var tr = await sb.from('tasks').select('title,description,status,priority')
       .eq('employee_id', empId).order('created_at', { ascending: false }).limit(30);
+    if (tr.error) { console.error('loadEmployeeTasks error:', tr.error); employeeTasksCtx = '📋 שגיאה בטעינת משימות: ' + tr.error.message; return; }
     var tasks = tr.data || [];
     if (!tasks.length) { employeeTasksCtx = '📋 אין משימות פתוחות לעובד כרגע.'; return; }
     employeeTasksCtx = '📋 המשימות של העובד:\n' + tasks.map(function(t) {
       var p = t.priority === 'דחוף' ? '🔴' : t.priority === 'בינוני' ? '🟡' : '🟢';
       return '  ' + p + ' [' + t.status + '] ' + t.title + (t.description ? ' — ' + t.description.substring(0, 80) : '');
     }).join('\n');
-  } catch(e) {}
+    console.log('loadEmployeeTasks success:', employeeTasksCtx);
+  } catch(e) { console.error('loadEmployeeTasks exception:', e); employeeTasksCtx = '📋 שגיאה בטעינת משימות.'; }
 }
 
 async function initMemory() {

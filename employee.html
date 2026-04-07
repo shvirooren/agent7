@@ -647,9 +647,24 @@ function switchTab(tab){
   document.getElementById('tab-tasks').classList.toggle('on',tab==='tasks');
   document.getElementById('tab-agent').classList.toggle('on',tab==='agent');
   document.getElementById('tasks-view').style.display=tab==='tasks'?'block':'none';
-  var ap=document.getElementById('agent-panel');
-  ap.style.display=tab==='agent'?'flex':'none';
-  if(tab==='agent'&&!roleAgent)loadRoleAgent();
+  if(tab==='agent'){
+    openEmployeeAgent();
+  }
+}
+
+function openEmployeeAgent(){
+  if(!EMP_ID)return;
+  sb.from('employees').select('role_id').eq('id',EMP_ID).maybeSingle().then(function(r){
+    var roleId=r.data&&r.data.role_id;
+    if(!roleId){
+      alert('לא שויכת לתפקיד עדיין — פנה למנהל.');
+      document.getElementById('tab-tasks').click();
+      return;
+    }
+    sessionStorage.setItem('autoOpenRole', roleId);
+    sessionStorage.setItem('chatBackUrl', 'employee.html');
+    window.location.href='chat.html';
+  });
 }
 
 // ══════════════════════════════════════════

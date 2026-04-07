@@ -385,7 +385,8 @@ function appendMsg(text, cls) {
 }
 
 function goBack() {
-  window.location.href = 'agent-setup.html';
+  var back = sessionStorage.getItem('chatBackUrl') || 'agent-setup.html';
+  window.location.href = back;
 }
 
 function esc(s) {

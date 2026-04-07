@@ -2686,23 +2686,12 @@ var _rcaRoleId=null, _rcaHistory=[];
 
 function openRoleChat(btn){
   var roleId=btn.dataset.roleId;
-  var role=allRoles.find(function(r){return r.id===roleId;});
-  if(!role)return;
-  _rcaRoleId=roleId;
-  _rcaHistory=[];
-  document.getElementById('rca-title').textContent=role.title;
-  document.getElementById('rca-subtitle').textContent=role.description||'';
-  var box=document.getElementById('rca-messages');
-  box.innerHTML='<div data-placeholder style="text-align:center;color:var(--gt);font-size:13px;padding:30px">שלח הודעה כדי להתחיל שיחה עם הסוכן</div>';
-  document.getElementById('rca-input').value='';
-  document.getElementById('agent-chat-modal').style.display='flex';
-  setTimeout(function(){document.getElementById('rca-input').focus();},100);
+  sessionStorage.setItem('autoOpenRole', roleId);
+  sessionStorage.setItem('chatBackUrl', 'dashboard.html');
+  window.location.href='chat.html';
 }
 
-function closeRoleChat(){
-  document.getElementById('agent-chat-modal').style.display='none';
-  _rcaRoleId=null; _rcaHistory=[];
-}
+function closeRoleChat(){}
 
 async function trainRoleAgent(){
   if(_rcaHistory.length<2){toast('נדרשות לפחות 2 הודעות לפני אימון','warning');return;}

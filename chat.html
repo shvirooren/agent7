@@ -165,6 +165,7 @@ var sb = supabase.createClient(SURL, SKEY);
 
 var CU = null, role = null, chatHistory = [], currentCtrl = null;
 var agentMemory = [], agentId = null, _learnInProgress = false;
+var employeeTasksCtx = '';
 
 function stopChat() {
   if (currentCtrl) { currentCtrl.abort(); currentCtrl = null; }
@@ -199,6 +200,8 @@ function setSending(on) {
     document.getElementById('inp').focus();
     showSuggestions();
     if (!CU.is_anonymous) initMemory();
+    var empId = sessionStorage.getItem('chatEmployeeId');
+    if (empId) { sessionStorage.removeItem('chatEmployeeId'); loadEmployeeTasks(empId); }
   } catch(e) {
     showLoadErr('שגיאה: ' + e.message);
   }
@@ -269,7 +272,7 @@ async function send() {
           title:            role.title,
           description:      role.description || '',
           responsibilities: role.responsibilities || '',
-          system_prompt:    role.system_prompt || ''
+          system_prompt:    (role.system_prompt || '') + (employeeTasksCtx ? '\n\n' + employeeTasksCtx : '')
         },
         memory:               agentMemory,
         conversation_history: chatHistory.slice(-8),
@@ -402,6 +405,19 @@ async function goBack() {
   sessionStorage.removeItem('chatBackUrl');
   if (agentId && chatHistory.length >= 4) await triggerLearn();
   window.location.href = back || 'dashboard.html';
+}
+
+async function loadEmployeeTasks(empId) {
+  try {
+    var tr = await sb.from('tasks').select('title,description,status,priority')
+      .eq('employee_id', empId).order('created_at', { ascending: false }).limit(30);
+    var tasks = tr.data || [];
+    if (!tasks.length) return;
+    employeeTasksCtx = '📋 המשימות של העובד:\n' + tasks.map(function(t) {
+      var p = t.priority === 'דחוף' ? '🔴' : t.priority === 'בינוני' ? '🟡' : '🟢';
+      return '  ' + p + ' [' + t.status + '] ' + t.title + (t.description ? ' — ' + t.description.substring(0, 80) : '');
+    }).join('\n');
+  } catch(e) {}
 }
 
 async function initMemory() {

@@ -1001,6 +1001,7 @@ sb.auth.getSession().then(function(r){
     loadCompanyName();
     loadEmployees();
     setTimeout(function(){loadTasks();loadTaskEmployees();},150);
+    ensureManagerAgent();
     if(sessionStorage.getItem('autoOpenRole')){
       setTimeout(function(){sp('agents');},400);
     }
@@ -1018,17 +1019,10 @@ var MANAGER_FULL_PERMISSIONS = {
   orders:    { read: true, write: true }
 };
 
-async function openManagerAgent() {
-  if (!CU) return;
-  // Find or create the manager's personal agent
-  var res = await sb.from('job_roles')
-    .select('id')
-    .eq('user_id', CU.id)
-    .eq('title', MANAGER_AGENT_TITLE)
-    .maybeSingle();
-
+async function ensureManagerAgent() {
+  if (!CU) return null;
+  var res = await sb.from('job_roles').select('id').eq('user_id', CU.id).eq('title', MANAGER_AGENT_TITLE).maybeSingle();
   var roleId = res.data && res.data.id;
-
   if (!roleId) {
     var ins = await sb.from('job_roles').insert({
       user_id:         CU.id,
@@ -1038,13 +1032,18 @@ async function openManagerAgent() {
       system_prompt:   'אתה Agent 7, העוזר האישי של המנהל. יש לך גישה מלאה לכל נתוני המערכת. אתה יכול ליצור ולעדכן משימות, לנהל עובדים, לעקוב אחר משלוחים, ולייצר מסמכים ודוחות. ענה תמיד בעברית, היה יוזם ומועיל.',
       permissions:     MANAGER_FULL_PERMISSIONS
     }).select('id').single();
-    if (ins.error) { toast('שגיאה ביצירת סוכן מנהל', 'error'); return; }
+    if (ins.error) return null;
     roleId = ins.data.id;
   } else {
-    // Ensure permissions are always up to date
     await sb.from('job_roles').update({ permissions: MANAGER_FULL_PERMISSIONS }).eq('id', roleId);
   }
+  return roleId;
+}
 
+async function openManagerAgent() {
+  if (!CU) return;
+  var roleId = await ensureManagerAgent();
+  if (!roleId) { toast('שגיאה ביצירת סוכן מנהל', 'error'); return; }
   sessionStorage.setItem('autoOpenRole', roleId);
   sessionStorage.setItem('chatBackUrl', 'dashboard.html');
   window.location.href = 'chat.html';

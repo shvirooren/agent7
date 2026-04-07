@@ -209,8 +209,10 @@ function setSending(on) {
     if (!empId && !CU.is_anonymous) {
       // Auto-detect: check if this user is an employee
       var euRes = await sb.from('employee_users').select('employee_id,manager_id').eq('auth_user_id', CU.id).maybeSingle();
+      console.log('[debug] employee_users lookup:', JSON.stringify(euRes));
       if (euRes.data) { empId = euRes.data.employee_id; mgrId = euRes.data.manager_id; }
     }
+    console.log('[debug] empId=', empId, 'mgrId=', mgrId, 'CU.id=', CU.id, 'is_anonymous=', CU.is_anonymous);
     if (empId) {
       _chatEmpId = empId;
       if (mgrId) _chatMgrId = mgrId;

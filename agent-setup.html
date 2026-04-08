@@ -260,9 +260,29 @@
       .card-body, .proc-wrap, .done-wrap { padding: 20px; }
       .stats { flex-direction: column; gap: 8px; }
     }
+    /* Confirm dialog */
+    #a7-confirm{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:8000;align-items:center;justify-content:center}
+    #a7-confirm.open{display:flex}
+    #a7-confirm-box{background:#fff;border-radius:10px;padding:28px 28px 22px;max-width:360px;width:90%;direction:rtl;box-shadow:0 24px 64px rgba(0,0,0,.25)}
+    #a7-confirm-msg{font-size:15px;font-weight:600;color:#1e293b;margin-bottom:20px;line-height:1.5}
+    #a7-confirm-btns{display:flex;gap:8px}
+    #a7-confirm-ok{flex:1;padding:10px;background:#ef4444;color:#fff;border:none;border-radius:8px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit}
+    #a7-confirm-ok:hover{background:#dc2626}
+    #a7-confirm-cancel{flex:1;padding:10px;background:#f1f5f9;color:#1e293b;border:1.5px solid #e2e8f0;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;font-family:inherit}
+    #a7-confirm-cancel:hover{background:#e2e8f0}
   </style>
 </head>
 <body>
+
+<div id="a7-confirm">
+  <div id="a7-confirm-box">
+    <div id="a7-confirm-msg"></div>
+    <div id="a7-confirm-btns">
+      <button id="a7-confirm-ok">מחק</button>
+      <button id="a7-confirm-cancel" onclick="a7ConfirmClose()">ביטול</button>
+    </div>
+  </div>
+</div>
 
 <div class="topbar">
   <div class="logo">
@@ -525,9 +545,16 @@ function collectPermissions() {
 var allRolesData = [];
 
 async function loadExistingRoles() {
-  var { data } = await sb.from('job_roles').select('*').eq('user_id', CU.id).order('created_at');
-  allRolesData = data || [];
+  try {
+    var { data, error } = await sb.from('job_roles').select('*').eq('user_id', CU.id).order('created_at');
+    if (error) throw error;
+    allRolesData = data || [];
+  } catch(e) {
+    toast('שגיאה בטעינת סוכנים קיימים', 'error');
+    allRolesData = [];
+  }
   var sel = document.getElementById('existing-role');
+  if (!sel) return;
   sel.innerHTML = !allRolesData.length
     ? '<option value="">אין סוכנים קיימים — צור חדש</option>'
     : '<option value="">בחר סוכן...</option>' + allRolesData.map(function(r) {
@@ -551,11 +578,20 @@ async function loadExistingRoleData() {
 // ── Knowledge files list ───────────────────────────────────────
 async function loadKnowledgeFiles() {
   var container = document.getElementById('existing-files-list');
+  if (!container) return;
   if (!selectedRoleId) { container.innerHTML = '<div class="ef-empty">בחר סוכן כדי לראות קבצים</div>'; return; }
   container.innerHTML = '<div class="ef-empty">טוען...</div>';
-  var { data } = await sb.from('role_knowledge_files')
-    .select('*').eq('role_id', selectedRoleId).eq('manager_id', CU.id)
-    .order('created_at', { ascending: false });
+  var data;
+  try {
+    var res = await sb.from('role_knowledge_files')
+      .select('*').eq('role_id', selectedRoleId).eq('manager_id', CU.id)
+      .order('created_at', { ascending: false });
+    if (res.error) throw res.error;
+    data = res.data;
+  } catch(e) {
+    container.innerHTML = '<div class="ef-empty" style="color:var(--rd)">שגיאה בטעינת קבצים</div>';
+    return;
+  }
   if (!data || !data.length) {
     container.innerHTML = '<div class="ef-empty">אין קבצים בבסיס הידע עדיין</div>';
     return;
@@ -571,18 +607,27 @@ async function loadKnowledgeFiles() {
   }).join('');
 }
 
+function a7Confirm(msg, cb) {
+  document.getElementById('a7-confirm-msg').textContent = msg;
+  var okBtn = document.getElementById('a7-confirm-ok');
+  okBtn.onclick = function() { a7ConfirmClose(); cb(); };
+  document.getElementById('a7-confirm').classList.add('open');
+}
+function a7ConfirmClose() { document.getElementById('a7-confirm').classList.remove('open'); }
+
 async function deleteKnowledgeFile(fileId, filename) {
-  if (!confirm('למחוק את "' + filename + '" מבסיס הידע?\nכל קטעי הידע של הקובץ יימחקו.')) return;
-  // Delete chunks with this filename
-  await sb.from('role_knowledge_chunks')
-    .delete()
-    .eq('role_id', selectedRoleId)
-    .eq('manager_id', CU.id)
-    .eq('source_filename', filename);
-  // Delete file record
-  await sb.from('role_knowledge_files').delete().eq('id', fileId);
-  toast('הקובץ נמחק', 'success');
-  await loadKnowledgeFiles();
+  a7Confirm('למחוק את "' + filename + '" מבסיס הידע? כל קטעי הידע של הקובץ יימחקו.', async function() {
+    // Delete chunks with this filename
+    await sb.from('role_knowledge_chunks')
+      .delete()
+      .eq('role_id', selectedRoleId)
+      .eq('manager_id', CU.id)
+      .eq('source_filename', filename);
+    // Delete file record
+    await sb.from('role_knowledge_files').delete().eq('id', fileId);
+    toast('הקובץ נמחק', 'success');
+    await loadKnowledgeFiles();
+  });
 }
 
 // ── Mode toggle ────────────────────────────────────────────────
@@ -746,13 +791,15 @@ async function startProcessing() {
 
     var fileId = null;
     var upRes = await sb.storage.from('role-knowledge').upload(storagePath, f.fileObj, { upsert: true });
-    if (!upRes.error) {
-      var regRes = await sb.from('role_knowledge_files').upsert({
-        role_id: selectedRoleId, manager_id: CU.id,
-        filename: f.name, file_size: f.size, storage_path: storagePath
-      }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
-      if (regRes.data) fileId = regRes.data.id;
+    if (upRes.error) {
+      toast('שגיאה בהעלאת "' + f.name + '": ' + upRes.error.message, 'error');
+      files[i].status = 'error'; renderFileList(); continue;
     }
+    var regRes = await sb.from('role_knowledge_files').upsert({
+      role_id: selectedRoleId, manager_id: CU.id,
+      filename: f.name, file_size: f.size, storage_path: storagePath
+    }, { onConflict: 'role_id,manager_id,filename' }).select('id').single();
+    if (regRes.data) fileId = regRes.data.id;
 
     var totalBatches = Math.ceil(content.length / BATCH);
     try {
@@ -770,7 +817,7 @@ async function startProcessing() {
             append: !(firstIndex && bi === 0)
           })
         });
-        var idxData = await idxRes.json();
+        var idxData = await idxRes.json().catch(function(){return {};});
         if (!idxRes.ok) throw new Error('[' + idxRes.status + '] ' + (idxData.error || 'שגיאת שרת'));
         indexed += idxData.indexed || 0;
         firstIndex = false;
@@ -778,8 +825,9 @@ async function startProcessing() {
       files[i].status = 'indexed';
     } catch(e) {
       files[i].status = 'error';
+      toast('שגיאה בעיבוד "' + f.name + '": ' + e.message, 'error');
       var dbg = document.getElementById('debug-error');
-      dbg.textContent = e.message; dbg.style.display = 'block';
+      if (dbg) { dbg.textContent = e.message; dbg.style.display = 'block'; }
     }
     renderFileList();
   }

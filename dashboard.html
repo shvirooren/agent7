@@ -935,6 +935,8 @@ var SURL='https://gmjfhjnwoymmxfqdazqf.supabase.co';
 var SKEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdtamZoam53b3ltbXhmcWRhenFmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI3MTQ2MjksImV4cCI6MjA4ODI5MDYyOX0.oVQOSQU_4mWDyjecT0gLwenp2FiBK-pdhZ0RDbVvgXg';
 var sb=supabase.createClient(SURL,SKEY);
 var WORKER_URL='https://agent7-ai.shvirooren.workers.dev';
+var ST={OPEN:'פתוח', PROGRESS:'בביצוע', DONE:'הושלם'};
+var PR={URGENT:'דחוף', MEDIUM:'בינוני', NORMAL:'רגיל'};
 var CU=null, allTasks=[], allEmployees=[], currentFilter='all', currentView='list', dragTaskId=null;
 var allRoles=[], assignTargetEmpId=null;
 var ROLE_WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
@@ -1092,7 +1094,7 @@ function addTask(){
   var desc=document.getElementById('task-desc').value.trim();
   var priority=document.getElementById('task-priority').value;
   if(!empId||!title){toast('בחר עובד והכנס כותרת','warning');return;}
-  sb.from('tasks').insert({user_id:CU.id,employee_id:empId,title:title,description:desc,priority:priority,status:'פתוח'}).select().then(function(r){
+  sb.from('tasks').insert({user_id:CU.id,employee_id:empId,title:title,description:desc,priority:priority,status:ST.OPEN}).select().then(function(r){
     if(r.error){toast('שגיאה: '+r.error.message,'error');return;}
     document.getElementById('task-title').value='';
     document.getElementById('task-desc').value='';
@@ -1110,7 +1112,7 @@ function addTaskWithFile(){
   var desc=document.getElementById('task-desc').value.trim();
   var priority=document.getElementById('task-priority').value;
   if(!empId||!title){toast('בחר עובד והכנס כותרת','warning');if(fileInput)fileInput.value='';return;}
-  sb.from('tasks').insert({user_id:CU.id,employee_id:empId,title:title,description:desc,priority:priority,status:'פתוח'}).select().then(function(r){
+  sb.from('tasks').insert({user_id:CU.id,employee_id:empId,title:title,description:desc,priority:priority,status:ST.OPEN}).select().then(function(r){
     if(r.error){toast('שגיאה: '+r.error.message,'error');return;}
     var taskId=r.data[0].id;
     document.getElementById('task-title').value='';
@@ -1132,7 +1134,7 @@ function addTaskWithFile(){
 
 function loadTasks(){
   if(!CU)return;
-  sb.from('tasks').select('*,employees(id,name,department,role)').eq('user_id',CU.id).order('created_at',{ascending:false}).then(function(r){
+  sb.from('tasks').select('*,employees(id,name,department,role)').eq('user_id',CU.id).order('created_at',{ascending:false}).limit(500).then(function(r){
     if(r.error)return;
     allTasks=r.data||[];
     updateStats();
@@ -1143,9 +1145,9 @@ function loadTasks(){
 
 function updateStats(){
   document.getElementById('stat-total').textContent=allTasks.length;
-  document.getElementById('stat-open').textContent=allTasks.filter(function(t){return t.status==='פתוח';}).length;
-  document.getElementById('stat-progress').textContent=allTasks.filter(function(t){return t.status==='בביצוע';}).length;
-  document.getElementById('stat-done').textContent=allTasks.filter(function(t){return t.status==='הושלם';}).length;
+  document.getElementById('stat-open').textContent=allTasks.filter(function(t){return t.status===ST.OPEN;}).length;
+  document.getElementById('stat-progress').textContent=allTasks.filter(function(t){return t.status===ST.PROGRESS;}).length;
+  document.getElementById('stat-done').textContent=allTasks.filter(function(t){return t.status===ST.DONE;}).length;
 }
 
 function filterTasks(filter,btn){
@@ -1160,6 +1162,7 @@ var COLORS=['#0055A4','#16A34A','#D97706','#DC2626','#7C3AED','#0891B2','#BE185D
 
 function renderTasksByEmployee(){
   var container=document.getElementById('tasks-by-emp');
+  if(!container)return;
   var filtered=currentFilter==='all'?allTasks:allTasks.filter(function(t){return t.status===currentFilter;});
 
   if(filtered.length===0){
@@ -1189,9 +1192,9 @@ function renderTasksByEmployee(){
     var tasks=ed.tasks;
     var color=COLORS[idx%COLORS.length];
     var initial=(emp.name||'?').charAt(0).toUpperCase();
-    var openCount=tasks.filter(function(t){return t.status==='פתוח';}).length;
-    var progCount=tasks.filter(function(t){return t.status==='בביצוע';}).length;
-    var doneCount=tasks.filter(function(t){return t.status==='הושלם';}).length;
+    var openCount=tasks.filter(function(t){return t.status===ST.OPEN;}).length;
+    var progCount=tasks.filter(function(t){return t.status===ST.PROGRESS;}).length;
+    var doneCount=tasks.filter(function(t){return t.status===ST.DONE;}).length;
 
     html+='<div class="emp-section">';
     html+='<div class="emp-section-header" onclick="toggleEmpSection(this)">';
@@ -1210,7 +1213,7 @@ function renderTasksByEmployee(){
 
     html+='<div class="emp-tasks hidden">';
     tasks.forEach(function(t){
-      var isDone=t.status==='הושלם';
+      var isDone=t.status===ST.DONE;
       var pc=priorityClass[t.priority]||'normal';
       var pb=priorityBadge[t.priority]||'bbl';
       html+='<div class="task-row '+pc+(isDone?' done-row':'')+'">';
@@ -1222,9 +1225,9 @@ function renderTasksByEmployee(){
       if(t.description)html+='<div class="task-desc-m">'+esc(t.description)+'</div>';
       html+='</div>';
       html+='<select class="status-sel" onchange="updateTaskStatus(\''+t.id+'\',this.value)">';
-      html+='<option value="פתוח"'+(t.status==='פתוח'?' selected':'')+'>פתוח</option>';
-      html+='<option value="בביצוע"'+(t.status==='בביצוע'?' selected':'')+'>בביצוע</option>';
-      html+='<option value="הושלם"'+(t.status==='הושלם'?' selected':'')+'>הושלם</option>';
+      html+='<option value="'+ST.OPEN+'"'+(t.status===ST.OPEN?' selected':'')+'>פתוח</option>';
+      html+='<option value="'+ST.PROGRESS+'"'+(t.status===ST.PROGRESS?' selected':'')+'>בביצוע</option>';
+      html+='<option value="'+ST.DONE+'"'+(t.status===ST.DONE?' selected':'')+'>הושלם</option>';
       html+='</select>';
       html+='<button class="bsm bsb" onclick="openEditTask(\''+t.id+'\')" style="margin-left:4px">✏️ ערוך</button>';
       html+='<button class="bsm" onclick="printTaskBon(\''+t.id+'\')" style="margin-left:4px;background:var(--bp);color:var(--bm);border:none;padding:4px 8px;border-radius:4px;cursor:pointer;font-size:12px">🖨️ בון</button>';
@@ -1247,12 +1250,13 @@ function toggleEmpSection(header){
 function updateTaskStatus(id,status){
   if(pendingUpdates[id])return;
   pendingUpdates[id]=true;
+  var wdog=setTimeout(function(){delete pendingUpdates[id];},10000);
   sb.from('tasks').update({status:status,updated_at:new Date().toISOString()}).eq('id',id).eq('user_id',CU.id).then(function(r){
-    delete pendingUpdates[id];
+    clearTimeout(wdog);delete pendingUpdates[id];
     if(r.error){toast('שגיאה בעדכון','error');return;}
     toast('סטטוס עודכן','success',1800);
     loadTasks();
-  });
+  }).catch(function(){clearTimeout(wdog);delete pendingUpdates[id];toast('שגיאת רשת בעדכון סטטוס','error');});
 }
 
 function deleteTask(id){
@@ -1272,8 +1276,8 @@ function openEditTask(id){
   document.getElementById('etask-id').value = id;
   document.getElementById('etask-title').value = task.title||'';
   document.getElementById('etask-desc').value = task.description||'';
-  document.getElementById('etask-priority').value = task.priority||'רגיל';
-  document.getElementById('etask-status').value = task.status||'פתוח';
+  document.getElementById('etask-priority').value = task.priority||PR.NORMAL;
+  document.getElementById('etask-status').value = task.status||ST.OPEN;
   // populate employee select
   var sel = document.getElementById('etask-employee');
   sel.innerHTML = '<option value="">ללא שיוך</option>';
@@ -1310,8 +1314,9 @@ function setView(view){
   currentView = view;
   document.getElementById('vt-list').classList.toggle('on', view==='list');
   document.getElementById('vt-kanban').classList.toggle('on', view==='kanban');
-  document.getElementById('tasks-by-emp').style.display = view==='list' ? '' : 'none';
-  document.getElementById('kanban-board').style.display = view==='kanban' ? '' : 'none';
+  var tbe=document.getElementById('tasks-by-emp'), kb=document.getElementById('kanban-board');
+  if(tbe)tbe.style.display = view==='list' ? '' : 'none';
+  if(kb)kb.style.display = view==='kanban' ? '' : 'none';
   // hide filters in kanban (kanban shows all)
   document.querySelectorAll('#tasks-filters-row .fbtn').forEach(function(b){
     b.style.display = view==='kanban' ? 'none' : '';
@@ -1321,7 +1326,7 @@ function setView(view){
 
 // ── Kanban ──
 function renderKanban(){
-  var statuses = ['פתוח', 'בביצוע', 'הושלם'];
+  var statuses = [ST.OPEN, ST.PROGRESS, ST.DONE];
   var priorityClass={דחוף:'urgent',בינוני:'medium',רגיל:'normal'};
   var priorityBadge={דחוף:'brd',בינוני:'bor',רגיל:'bbl'};
 
@@ -1330,7 +1335,7 @@ function renderKanban(){
     if(!zone) return;
     var tasks = allTasks.filter(function(t){return t.status===status;});
     // update count badges
-    var countMap = {פתוח:'kcount-open', בביצוע:'kcount-progress', הושלם:'kcount-done'};
+    var countMap = {};countMap[ST.OPEN]='kcount-open';countMap[ST.PROGRESS]='kcount-progress';countMap[ST.DONE]='kcount-done';
     var countEl = document.getElementById(countMap[status]);
     if(countEl) countEl.textContent = tasks.length;
 
@@ -1379,23 +1384,27 @@ function onDragOver(e){
 function onDragLeave(e){
   e.currentTarget.classList.remove('drag-over');
 }
+var _dropInProgress=false;
 function onDrop(e){
   e.preventDefault();
   e.currentTarget.classList.remove('drag-over');
+  if(_dropInProgress)return;
   var newStatus = e.currentTarget.dataset.status;
   if(!dragTaskId || !newStatus) return;
   var task = allTasks.find(function(t){return t.id===dragTaskId;});
   if(!task || task.status === newStatus) return;
-  // optimistic update
-  task.status = newStatus;
+  var prevStatus = task.status;
+  _dropInProgress=true;
+  task.status = newStatus; // optimistic
   updateStats();
   renderKanban();
-  // persist
-  sb.from('tasks').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',dragTaskId).eq('user_id',CU.id).then(function(r){
-    if(r.error){toast('שגיאה בעדכון','error');loadTasks();}
+  var dropId=dragTaskId;
+  dragTaskId=null;
+  sb.from('tasks').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',dropId).eq('user_id',CU.id).then(function(r){
+    _dropInProgress=false;
+    if(r.error){task.status=prevStatus;updateStats();renderKanban();toast('שגיאה בעדכון','error');}
     else{toast('סטטוס עודכן','success',1800);loadTasks();}
-    dragTaskId = null;
-  });
+  }).catch(function(){_dropInProgress=false;task.status=prevStatus;updateStats();renderKanban();toast('שגיאת רשת בעדכון','error');});
 }
 
 // ── Employees ──
@@ -1453,6 +1462,7 @@ function addEmployee(){
   var dept=document.getElementById('emp-dept').value.trim();
   var role=document.getElementById('emp-role').value.trim();
   if(!name||!email){toast('שם ואימייל הם שדות חובה','warning');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('כתובת האימייל אינה תקינה','warning');return;}
   sb.from('employees').insert({user_id:CU.id,name:name,email:email,department:dept,role:role,active:true}).then(function(r){
     if(r.error){toast('שגיאה: '+r.error.message,'error');return;}
     toast('העובד נוסף בהצלחה','success');
@@ -1528,6 +1538,7 @@ function saveEditEmp(){
   var dept=document.getElementById('edit-emp-dept').value.trim();
   var role=document.getElementById('edit-emp-role').value.trim();
   if(!name||!email){toast('שם ואימייל הם שדות חובה','warning');return;}
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){toast('כתובת האימייל אינה תקינה','warning');return;}
   sb.from('employees').update({name:name,email:email,department:dept,role:role}).eq('id',id).eq('user_id',CU.id).then(function(r){
     if(r.error){toast('שגיאה: '+r.error.message,'error');return;}
     toast('פרטי העובד עודכנו','success');
@@ -1685,57 +1696,61 @@ async function buildLiveContext() {
 - DELETE_SHIPMENT: {"action":"DELETE_SHIPMENT","params":{"shipment_id":"הid המדויק של המשלוח מהרשימה"},"reply":"..."}
 ═══════════════════\n\n`;
 
+  // helper: מוסיף שורה לקונטקסט רק אם לא חרגנו ממגבלת התווים
+  const CTX_LIMIT = 18000;
+  function ctxAdd(line) { if (ctx.length < CTX_LIMIT) ctx += line; }
+
   // עובדים
   const activeEmps = employees.filter(e => e.active);
-  ctx += `👥 עובדים פעילים (${activeEmps.length}):\n`;
-  activeEmps.forEach(e => { ctx += `  • ${e.name}${e.role?' — '+e.role:''}${e.department?' ('+e.department+')':''} [id:${e.id}]\n`; });
-  ctx += `\n`;
+  ctxAdd(`👥 עובדים פעילים (${activeEmps.length}):\n`);
+  activeEmps.slice(0,50).forEach(e => { ctxAdd(`  • ${e.name}${e.role?' — '+e.role:''}${e.department?' ('+e.department+')':''} [id:${e.id}]\n`); });
+  ctxAdd(`\n`);
 
   // משימות
-  const openT  = tasks.filter(t => t.status==='פתוח');
-  const progT  = tasks.filter(t => t.status==='בביצוע');
-  const doneT  = tasks.filter(t => t.status==='הושלם');
-  const urgT   = openT.filter(t => t.priority==='דחוף');
-  ctx += `📋 משימות: פתוחות ${openT.length} | בביצוע ${progT.length} | הושלמו ${doneT.length}${urgT.length?' | דחופות '+urgT.length+' ⚠️':''}\n`;
+  const openT  = tasks.filter(t => t.status===ST.OPEN);
+  const progT  = tasks.filter(t => t.status===ST.PROGRESS);
+  const doneT  = tasks.filter(t => t.status===ST.DONE);
+  const urgT   = openT.filter(t => t.priority===PR.URGENT);
+  ctxAdd(`📋 משימות: פתוחות ${openT.length} | בביצוע ${progT.length} | הושלמו ${doneT.length}${urgT.length?' | דחופות '+urgT.length+' ⚠️':''}\n`);
   if (openT.length > 0) {
-    ctx += `  פתוחות:\n`;
+    ctxAdd(`  פתוחות:\n`);
     openT.slice(0,15).forEach(t => {
-      const p = t.priority==='דחוף'?'🔴':t.priority==='בינוני'?'🟡':'🟢';
-      ctx += `    ${p} "${t.title}" → ${t.employees?.name||'ללא שיוך'} [id:${t.id}]\n`;
+      const p = t.priority===PR.URGENT?'🔴':t.priority===PR.MEDIUM?'🟡':'🟢';
+      ctxAdd(`    ${p} "${t.title}" → ${t.employees?.name||'ללא שיוך'} [id:${t.id}]\n`);
     });
   }
   if (progT.length > 0) {
-    ctx += `  בביצוע:\n`;
-    progT.slice(0,8).forEach(t => { ctx += `    🔵 "${t.title}" → ${t.employees?.name||'ללא שיוך'} [id:${t.id}]\n`; });
+    ctxAdd(`  בביצוע:\n`);
+    progT.slice(0,8).forEach(t => { ctxAdd(`    🔵 "${t.title}" → ${t.employees?.name||'ללא שיוך'} [id:${t.id}]\n`); });
   }
-  ctx += `\n`;
+  ctxAdd(`\n`);
 
   // משלוחים
-  ctx += `🚢 משלוחים (${shipments.length}):\n`;
-  if (shipments.length === 0) { ctx += `  אין משלוחים.\n`; }
+  ctxAdd(`🚢 משלוחים (${shipments.length}):\n`);
+  if (shipments.length === 0) { ctxAdd(`  אין משלוחים.\n`); }
   else {
     const byS = {'בדרך':[],'מאחר':[],'מכס':[],'הגיע':[]};
     shipments.forEach(s => { if(byS[s.status]) byS[s.status].push(s); else byS['בדרך'].push(s); });
     if (byS['מאחר'].length||byS['מכס'].length) {
-      ctx += `  ⚠️ דורשים תשומת לב:\n`;
-      [...byS['מאחר'],...byS['מכס']].forEach(s => { ctx += `    • ${s.supplier||'?'} | ${s.status} | ${s.transport_type||''} | [id:${s.id}]\n`; });
+      ctxAdd(`  ⚠️ דורשים תשומת לב:\n`);
+      [...byS['מאחר'],...byS['מכס']].forEach(s => { ctxAdd(`    • ${s.supplier||'?'} | ${s.status} | ${s.transport_type||''} | [id:${s.id}]\n`); });
     }
     if (byS['בדרך'].length) {
-      ctx += `  ✈️ בדרך (${byS['בדרך'].length}):\n`;
+      ctxAdd(`  ✈️ בדרך (${byS['בדרך'].length}):\n`);
       byS['בדרך'].slice(0,10).forEach(s => {
         const arr = s.arrival_date?new Date(s.arrival_date).toLocaleDateString('he-IL'):'לא ידוע';
-        ctx += `    • ${s.supplier||'?'} מ-${s.origin_country||'?'} | ${s.carrier||''} | הגעה: ${arr} | [id:${s.id}]\n`;
+        ctxAdd(`    • ${s.supplier||'?'} מ-${s.origin_country||'?'} | ${s.carrier||''} | הגעה: ${arr} | [id:${s.id}]\n`);
       });
     }
-    if (byS['הגיע'].length) ctx += `  ✅ הגיעו: ${byS['הגיע'].length}.\n`;
+    if (byS['הגיע'].length) ctxAdd(`  ✅ הגיעו: ${byS['הגיע'].length}.\n`);
   }
-  ctx += `\n`;
+  ctxAdd(`\n`);
 
   // הצעות מחיר
   if (quotes.length > 0) {
-    ctx += `💰 הצעות מחיר (${quotes.length}):\n`;
-    quotes.forEach(q => { ctx += `  • ${q.client_name||'?'}${q.project_name?' | '+q.project_name:''} | ${q.status} | ₪${Math.round(q.total||0).toLocaleString()} [id:${q.id}]\n`; });
-    ctx += `\n`;
+    ctxAdd(`💰 הצעות מחיר (${quotes.length}):\n`);
+    quotes.slice(0,20).forEach(q => { ctxAdd(`  • ${q.client_name||'?'}${q.project_name?' | '+q.project_name:''} | ${q.status} | ₪${Math.round(q.total||0).toLocaleString()} [id:${q.id}]\n`); });
+    ctxAdd(`\n`);
   }
 
   // הזמנות
@@ -1743,22 +1758,25 @@ async function buildLiveContext() {
   const suppOrders = orders.filter(o=>o.type==='supplier');
   if (orders.length > 0) {
     if (custOrders.length) {
-      ctx += `📦 הזמנות לקוחות (${custOrders.length}):\n`;
-      custOrders.forEach(o => { ctx += `  • ${o.client_name||'?'}${o.project_name?' | '+o.project_name:''} | ${o.status} | ₪${Math.round(o.total||0).toLocaleString()} [id:${o.id}]\n`; });
+      ctxAdd(`📦 הזמנות לקוחות (${custOrders.length}):\n`);
+      custOrders.slice(0,20).forEach(o => { ctxAdd(`  • ${o.client_name||'?'}${o.project_name?' | '+o.project_name:''} | ${o.status} | ₪${Math.round(o.total||0).toLocaleString()} [id:${o.id}]\n`); });
     }
     if (suppOrders.length) {
-      ctx += `🏭 הזמנות ספקים (${suppOrders.length}):\n`;
-      suppOrders.forEach(o => { ctx += `  • ${o.client_name||'?'}${o.project_name?' | '+o.project_name:''} | ${o.status} | ₪${Math.round(o.total||0).toLocaleString()} [id:${o.id}]\n`; });
+      ctxAdd(`🏭 הזמנות ספקים (${suppOrders.length}):\n`);
+      suppOrders.slice(0,20).forEach(o => { ctxAdd(`  • ${o.client_name||'?'}${o.project_name?' | '+o.project_name:''} | ${o.status} | ₪${Math.round(o.total||0).toLocaleString()} [id:${o.id}]\n`); });
     }
-    ctx += `\n`;
+    ctxAdd(`\n`);
   }
 
   if (memories.length > 0) {
-    ctx += `🧠 זיכרון:\n`;
-    memories.forEach(m => { ctx += `  • ${m.memory}\n`; });
-    ctx += `\n`;
+    ctxAdd(`🧠 זיכרון:\n`);
+    memories.forEach(m => { ctxAdd(`  • ${m.memory}\n`); });
+    ctxAdd(`\n`);
   }
-  if (companyKnowledge) ctx += `📄 מסמך ידע:\n${companyKnowledge.substring(0,20000)}\n\n`;
+  if (companyKnowledge) {
+    const remaining = Math.max(0, CTX_LIMIT - ctx.length - 20);
+    if (remaining > 200) ctx += `📄 מסמך ידע:\n${companyKnowledge.substring(0, remaining)}\n\n`;
+  }
 
   // פעולות נוספות
   ctx += `- CREATE_QUOTE: {"action":"CREATE_QUOTE","params":{"client_name":"...","client_phone":"...","project_name":"...","items":[{"desc":"...","qty":1,"unit_price":100}],"payment_terms":"...","vat":true,"notes":"..."},"reply":"..."}\n`;
@@ -1785,10 +1803,16 @@ async function executeAction(parsed) {
   // CREATE_TASK
   if (action === 'CREATE_TASK') {
     const empId = p.employee_id || null;
+    if (empId && !allEmployees.find(function(e){return e.id===empId;})) {
+      appendMsg('❌ העובד שצוין לא קיים במערכת', 'ai'); return;
+    }
+    const taskTitle = String(p.title||'משימה חדשה').trim() || 'משימה חדשה';
+    const taskDesc  = String(p.description||'').trim();
+    const taskPri   = [PR.URGENT,PR.MEDIUM,PR.NORMAL].includes(p.priority) ? p.priority : PR.NORMAL;
     const {error} = await sb.from('tasks').insert({
       user_id: CU.id, employee_id: empId,
-      title: p.title||'משימה חדשה', description: p.description||'',
-      priority: p.priority||'רגיל', status: 'פתוח'
+      title: taskTitle, description: taskDesc,
+      priority: taskPri, status: ST.OPEN
     });
     if (error) { appendMsg('❌ שגיאה ביצירת משימה: '+error.message, 'ai'); return; }
     loadTasks();
@@ -1801,6 +1825,9 @@ async function executeAction(parsed) {
   if (action === 'UPDATE_TASK_STATUS') {
     const taskId = p.task_id;
     if (!taskId) { appendMsg('❌ לא קיבלתי id של משימה', 'ai'); return; }
+    if (![ST.OPEN,ST.PROGRESS,ST.DONE].includes(p.status)) {
+      appendMsg('❌ סטטוס לא תקין: '+String(p.status||''), 'ai'); return;
+    }
     const {error} = await sb.from('tasks')
       .update({status: p.status, updated_at: new Date().toISOString()})
       .eq('id', taskId)
@@ -1814,13 +1841,16 @@ async function executeAction(parsed) {
 
   // CREATE_EMPLOYEE
   if (action === 'CREATE_EMPLOYEE') {
-    if (!p.name || !p.email) { appendMsg('❌ שם ואימייל הם שדות חובה ליצירת עובד', 'ai'); return; }
+    const empName  = String(p.name||'').trim();
+    const empEmail = String(p.email||'').trim();
+    if (!empName || !empEmail) { appendMsg('❌ שם ואימייל הם שדות חובה ליצירת עובד', 'ai'); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(empEmail)) { appendMsg('❌ כתובת אימייל לא תקינה', 'ai'); return; }
     const {error} = await sb.from('employees').insert({
       user_id: CU.id,
-      name: p.name,
-      email: p.email,
-      department: p.department || '',
-      role: p.role || '',
+      name: empName,
+      email: empEmail,
+      department: String(p.department||'').trim(),
+      role: String(p.role||'').trim(),
       active: true
     });
     if (error) { appendMsg('❌ שגיאה ביצירת עובד: ' + error.message, 'ai'); return; }
@@ -1848,14 +1878,17 @@ async function executeAction(parsed) {
 
   // CREATE_SHIPMENT
   if (action === 'CREATE_SHIPMENT') {
+    const VALID_TRANSPORT = ['אוויר','ים','יבשה','אקספרס'];
     const {error} = await sb.from('shipments').insert({
       manager_id: CU.id, status: 'בדרך',
-      supplier: p.supplier||'', carrier: p.carrier||'',
-      origin_country: p.origin_country||'', destination: p.destination||'',
-      transport_type: p.transport_type||'אוויר',
-      tracking_number: p.tracking_number||'',
+      supplier: String(p.supplier||'').trim(),
+      carrier: String(p.carrier||'').trim(),
+      origin_country: String(p.origin_country||'').trim(),
+      destination: String(p.destination||'').trim(),
+      transport_type: VALID_TRANSPORT.includes(p.transport_type) ? p.transport_type : 'אוויר',
+      tracking_number: String(p.tracking_number||'').trim(),
       arrival_date: p.arrival_date||null,
-      notes: p.notes||''
+      notes: String(p.notes||'').trim()
     });
     if (error) { appendMsg('❌ שגיאה ביצירת משלוח: '+error.message, 'ai'); return; }
     loadShipments();
@@ -1868,6 +1901,10 @@ async function executeAction(parsed) {
   if (action === 'UPDATE_SHIPMENT_STATUS') {
     const shipId = p.shipment_id;
     if (!shipId) { appendMsg('❌ לא קיבלתי id של משלוח', 'ai'); return; }
+    const VALID_SHIP_STATUSES = ['בדרך','הגיע','מאחר','מכס'];
+    if (!VALID_SHIP_STATUSES.includes(p.status)) {
+      appendMsg('❌ סטטוס משלוח לא תקין: '+String(p.status||''), 'ai'); return;
+    }
     const {error} = await sb.from('shipments')
       .update({status: p.status})
       .eq('id', shipId)
@@ -2129,7 +2166,7 @@ function sendEmailToChat(){
 function loadShipments(){
   if(!CU)return;
   showTableSkeleton('shipments-list',11,4);
-  sb.from('shipments').select('*').eq('manager_id',CU.id).order('created_at',{ascending:false}).then(function(r){
+  sb.from('shipments').select('*').eq('manager_id',CU.id).order('created_at',{ascending:false}).limit(300).then(function(r){
     var tb=document.getElementById('shipments-list');
     if(!r.data||r.data.length===0){
       tb.innerHTML='<tr><td colspan="11" style="text-align:center;color:var(--gt);padding:30px">אין משלוחים עדיין</td></tr>';
@@ -2321,7 +2358,7 @@ function autoSaveMemory(userMsg, aiReply) {
 }
 
 function doLogout(){
-  sb.auth.signOut().then(function(){window.location.href='login.html';});
+  sb.auth.signOut().then(function(){window.location.href='login.html';}).catch(function(){window.location.href='login.html';});
 }
 
 // ── Shared helpers ──
@@ -2355,7 +2392,7 @@ var quoteItemCounter=0, currentQuoteId=null, allQuotes=[];
 
 function loadQuotes(){
   if(!CU)return;
-  sb.from('quotes').select('*').eq('user_id',CU.id).order('created_at',{ascending:false}).then(function(r){
+  sb.from('quotes').select('*').eq('user_id',CU.id).order('created_at',{ascending:false}).limit(200).then(function(r){
     if(r.error){toast('שגיאה בטעינת הצעות מחיר','error');return;}
     allQuotes=r.data||[];renderQuotesList();
   });
@@ -2465,8 +2502,9 @@ function saveQuote(){
   op.then(function(r){if(btn){btn.disabled=false;btn.textContent='💾 שמור הצעה';}if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast(currentQuoteId?'✅ הצעת מחיר עודכנה':'✅ הצעת מחיר נוצרה','success');closeQuoteForm();loadQuotes();}).catch(function(){if(btn){btn.disabled=false;btn.textContent='💾 שמור הצעה';}toast('שגיאת רשת, נסה שוב','error');});
 }
 function deleteQuote(id){
-  if(!confirm('למחוק הצעת מחיר זו?'))return;
-  sb.from('quotes').delete().eq('id',id).eq('user_id',CU.id).then(function(r){if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast('נמחקה','success');loadQuotes();});
+  a7Confirm('למחוק הצעת מחיר זו?','מחק',function(){
+    sb.from('quotes').delete().eq('id',id).eq('user_id',CU.id).then(function(r){if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast('נמחקה','success');loadQuotes();});
+  });
 }
 function buildQuotePrintHtml(q){
   var items=q.items||[];var sub=items.reduce(function(s,it){return s+(it.total||0);},0);
@@ -2495,7 +2533,7 @@ var orderItemCounter=0, currentOrderId=null, currentOrderTab='customer', allOrde
 
 function loadOrders(){
   if(!CU)return;
-  sb.from('orders').select('*').eq('user_id',CU.id).order('created_at',{ascending:false}).then(function(r){
+  sb.from('orders').select('*').eq('user_id',CU.id).order('created_at',{ascending:false}).limit(200).then(function(r){
     if(r.error){toast('שגיאה בטעינת הזמנות','error');return;}
     allOrders=r.data||[];renderOrdersList();
   });
@@ -2606,8 +2644,9 @@ function saveOrder(){
   op.then(function(r){btn.disabled=false;btn.textContent='💾 שמור הזמנה';if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast(currentOrderId?'✅ הזמנה עודכנה':'✅ הזמנה נוצרה','success');closeOrderForm();loadOrders();}).catch(function(){btn.disabled=false;btn.textContent='💾 שמור הזמנה';toast('שגיאת רשת, נסה שוב','error');});
 }
 function deleteOrder(id){
-  if(!confirm('למחוק הזמנה זו?'))return;
-  sb.from('orders').delete().eq('id',id).eq('user_id',CU.id).then(function(r){if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast('נמחקה','success');loadOrders();});
+  a7Confirm('למחוק הזמנה זו?','מחק',function(){
+    sb.from('orders').delete().eq('id',id).eq('user_id',CU.id).then(function(r){if(r.error){toast('שגיאה: '+r.error.message,'error');return;}toast('נמחקה','success');loadOrders();});
+  });
 }
 function buildOrderPrintHtml(o){
   var items=o.items||[];var total=o.total||items.reduce(function(s,it){return s+(it.total||0);},0);
@@ -2820,8 +2859,8 @@ function saveRole(){
 }
 
 // מחיקת תפקיד
-async function deleteRole(btn){
-  if(!confirm('למחוק תפקיד זה? הסוכן וכל הזיכרון שלו יימחקו.'))return;
+function deleteRole(btn){
+  a7Confirm('למחוק תפקיד זה? הסוכן וכל הזיכרון שלו יימחקו.','מחק',async function(){
   var id=btn.dataset.id;
   try {
     // מחק זיכרון וסוכן (אין CASCADE מוגדר)
@@ -2843,6 +2882,7 @@ async function deleteRole(btn){
   } catch(e){
     toast('שגיאה במחיקה: '+e.message,'error');
   }
+  });
 }
 
 // פתיחת מודל זיכרון הסוכן
@@ -2853,7 +2893,7 @@ function openAgentMemoryModal(btn){
   document.getElementById('memory-modal-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--gt)">טוען...</div>';
   document.getElementById('agent-memory-modal').style.display='flex';
 
-  sb.from('role_agent_memory').select('*').eq('agent_id',agentId).order('importance',{ascending:false}).order('created_at',{ascending:false}).then(function(r){
+  sb.from('role_agent_memory').select('*').eq('agent_id',agentId).order('importance',{ascending:false}).order('created_at',{ascending:false}).limit(100).then(function(r){
     if(r.error){document.getElementById('memory-modal-content').innerHTML='<div style="text-align:center;padding:20px;color:var(--rd)">שגיאה בטעינת הזיכרון</div>';return;}
     var memory=r.data||[];
     document.getElementById('memory-modal-stats').innerHTML=
@@ -3343,11 +3383,12 @@ function agsLoadKnowledgeFiles(roleId){
 }
 
 function agsDeleteFile(fileId,filename,roleId){
-  if(!confirm('למחוק את "'+filename+'" מבסיס הידע?'))return;
-  sb.from('role_knowledge_chunks').delete().eq('role_id',roleId).eq('manager_id',CU.id).eq('source_filename',filename).then(function(){
-    sb.from('role_knowledge_files').delete().eq('id',fileId).then(function(){
-      toast('הקובץ נמחק','success');
-      agsLoadKnowledgeFiles(roleId);
+  a7Confirm('למחוק את "'+filename+'" מבסיס הידע?','מחק',function(){
+    sb.from('role_knowledge_chunks').delete().eq('role_id',roleId).eq('manager_id',CU.id).eq('source_filename',filename).then(function(){
+      sb.from('role_knowledge_files').delete().eq('id',fileId).then(function(){
+        toast('הקובץ נמחק','success');
+        agsLoadKnowledgeFiles(roleId);
+      });
     });
   });
 }

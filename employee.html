@@ -349,6 +349,12 @@ function skeletonCards(n){
 }
 
 // ═══════════════════════════
+//  CONSTANTS
+// ═══════════════════════════
+var ST={OPEN:'פתוח', PROGRESS:'בביצוע', DONE:'הושלם'};
+var PR={URGENT:'דחוף', MEDIUM:'בינוני', NORMAL:'רגיל'};
+
+// ═══════════════════════════
 //  STATE
 // ═══════════════════════════
 var CU=null, EMP_ID=null, MANAGER_ID=null, SESSION_JWT=null, allTasks=[], currentFilter='all', currentView='list', dragTaskId=null, employeeTasks=[];
@@ -388,46 +394,59 @@ sb.auth.getSession().then(function(r){
 function getEmployeeId(){
   sb.from('employee_users').select('employee_id,manager_id').eq('auth_user_id',CU.id).single().then(function(r){
     if(r.error||!r.data){
-      document.getElementById('tasks-list').innerHTML='<div class="empty"><div class="empty-icon">🔗</div>החשבון שלך עדיין לא מקושר לעובד.<br>פנה למנהל שלך.</div>';
+      var tl=document.getElementById('tasks-list');
+      if(tl)tl.innerHTML='<div class="empty"><div class="empty-icon">🔗</div>החשבון שלך עדיין לא מקושר לעובד.<br>פנה למנהל שלך.</div>';
       return;
     }
     EMP_ID=r.data.employee_id;
     MANAGER_ID=r.data.manager_id;
 
-    // Company name (non-blocking)
-    if(r.data.manager_id){
-      sb.from('companies').select('company_name').eq('manager_id',r.data.manager_id).single().then(function(cr){
-        if(cr.error&&cr.error.code!=='PGRST116')return;
-        if(cr.data&&cr.data.company_name){
-          document.getElementById('company-name-text').textContent=esc(cr.data.company_name);
-          document.getElementById('company-name-emp').style.display='inline-flex';
-          document.title=esc(cr.data.company_name)+' — Agent 7';
-        }
-      });
-    }
+    // Company name + Employee name — במקביל (non-blocking)
+    var pCompany = r.data.manager_id
+      ? sb.from('companies').select('company_name').eq('manager_id',r.data.manager_id).single()
+      : Promise.resolve({data:null,error:null});
+    var pEmpName = sb.from('employees').select('name').eq('id',EMP_ID).single();
 
-    // Employee name from employees table (overrides auth metadata)
-    sb.from('employees').select('name').eq('id',EMP_ID).single().then(function(er){
+    Promise.all([pCompany, pEmpName]).then(function(results){
+      var cr=results[0], er=results[1];
+      if(cr.data&&cr.data.company_name){
+        var cnt=document.getElementById('company-name-text');
+        var empEl=document.getElementById('company-name-emp');
+        if(cnt)cnt.textContent=esc(cr.data.company_name);
+        if(empEl)empEl.style.display='inline-flex';
+        document.title=esc(cr.data.company_name)+' — Agent 7';
+      }
       if(er.data&&er.data.name){
         var n=er.data.name;
-        document.getElementById('unm').textContent=esc(n);
-        document.getElementById('uav').textContent=n.charAt(0).toUpperCase();
-        document.getElementById('greeting-title').textContent=greet+' '+esc(n.split(' ')[0])+' 👋';
+        var unm=document.getElementById('unm'), uav=document.getElementById('uav'), gt=document.getElementById('greeting-title');
+        if(unm)unm.textContent=esc(n);
+        if(uav)uav.textContent=n.charAt(0).toUpperCase();
+        if(gt)gt.textContent=greet+' '+esc(n.split(' ')[0])+' 👋';
       }
-    });
+    }).catch(function(){});  // לא קריטי — הנתונים הם עיצוב בלבד
 
     loadTasks();
 
-    // Realtime subscription — שמירת reference למניעת כפילות
-    if(window._empTasksChannel) sb.removeChannel(window._empTasksChannel);
-    window._empTasksChannel=sb.channel('emp-tasks-'+EMP_ID)
-      .on('postgres_changes',{event:'INSERT',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
-        function(){loadTasks();})
-      .on('postgres_changes',{event:'UPDATE',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
-        function(){loadTasks();})
-      .on('postgres_changes',{event:'DELETE',schema:'public',table:'tasks'},
-        function(){loadTasks();})
-      .subscribe();
+    // Realtime subscription — מחיקת channel קודם לפני יצירת חדש (removeChannel הוא async)
+    var createEmpChannel=function(){
+      window._empTasksChannel=sb.channel('emp-tasks-'+EMP_ID)
+        .on('postgres_changes',{event:'INSERT',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+          function(){loadTasksDebounced();})
+        .on('postgres_changes',{event:'UPDATE',schema:'public',table:'tasks',filter:'employee_id=eq.'+EMP_ID},
+          function(){loadTasksDebounced();})
+        .on('postgres_changes',{event:'DELETE',schema:'public',table:'tasks'},
+          function(){loadTasksDebounced();})
+        .subscribe();
+    };
+    if(window._empTasksChannel){
+      sb.removeChannel(window._empTasksChannel).then(createEmpChannel);
+    }else{
+      createEmpChannel();
+    }
+  }).catch(function(){
+    toast('שגיאת רשת — לא ניתן לטעון את הפרופיל שלך','error');
+    var tl=document.getElementById('tasks-list');
+    if(tl)tl.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div>שגיאת חיבור — נסה לרענן את הדף.</div>';
   });
 }
 
@@ -441,19 +460,22 @@ function loadTasks(){
       allTasks=(r.data||[]).map(function(t){t.files=t.files||[];return t;});
       // Sort: open first, in-progress, done last
       allTasks.sort(function(a,b){
-        var order={פתוח:0,בביצוע:1,הושלם:2};
+        var order={};order[ST.OPEN]=0;order[ST.PROGRESS]=1;order[ST.DONE]=2;
         return (order[a.status]||0)-(order[b.status]||0);
       });
       updateStats();
       if(currentView==='kanban')renderKanban();
       else renderTasks();
+    }).catch(function(){
+      showErr('שגיאת רשת — לא ניתן לטעון משימות');
     });
 }
 
 function updateStats(){
-  document.getElementById('s-open').textContent=allTasks.filter(function(t){return t.status==='פתוח';}).length;
-  document.getElementById('s-progress').textContent=allTasks.filter(function(t){return t.status==='בביצוע';}).length;
-  document.getElementById('s-done').textContent=allTasks.filter(function(t){return t.status==='הושלם';}).length;
+  var so=document.getElementById('s-open'),sp=document.getElementById('s-progress'),sd=document.getElementById('s-done');
+  if(so)so.textContent=allTasks.filter(function(t){return t.status===ST.OPEN;}).length;
+  if(sp)sp.textContent=allTasks.filter(function(t){return t.status===ST.PROGRESS;}).length;
+  if(sd)sd.textContent=allTasks.filter(function(t){return t.status===ST.DONE;}).length;
 }
 
 // ═══════════════════════════
@@ -462,7 +484,7 @@ function updateStats(){
 function updateStatus(id,status,btn){
   if(pendingStatusUpdate[id])return; // prevent double-click
   pendingStatusUpdate[id]=true;
-  pendingStatusTimer[id]=setTimeout(function(){delete pendingStatusUpdate[id];delete pendingStatusTimer[id];if(btn)btn.disabled=false;},15000);
+  pendingStatusTimer[id]=setTimeout(function(){delete pendingStatusUpdate[id];delete pendingStatusTimer[id];if(btn)btn.disabled=false;},8000);
   if(btn){
     btn.disabled=true;
     btn.innerHTML=btn.innerHTML+'<span class="btn-spinner"></span>';
@@ -477,7 +499,7 @@ function updateStatus(id,status,btn){
         if(btn){btn.disabled=false;btn.innerHTML=btn.innerHTML.replace(/<span class="btn-spinner"><\/span>/,'');}
         return;
       }
-      var statusLabels={פתוח:'פתוח',בביצוע:'בביצוע',הושלם:'הושלם ✓'};
+      var statusLabels={};statusLabels[ST.OPEN]='פתוח';statusLabels[ST.PROGRESS]='בביצוע';statusLabels[ST.DONE]='הושלם ✓';
       toast('סטטוס עודכן ל: '+statusLabels[status],'success',2000);
       loadTasks();
     });
@@ -503,7 +525,7 @@ function renderTasks(){
     return;
   }
   list.innerHTML=filtered.map(function(t,i){
-    var isDone=t.status==='הושלם', isProgress=t.status==='בביצוע';
+    var isDone=t.status===ST.DONE, isProgress=t.status===ST.PROGRESS;
     var pc=priorityClass[t.priority]||'normal';
     var ic=isDone?'don':(iconClass[t.priority]||'nor');
     var ie=isDone?'✅':(iconEmoji[t.priority]||'🔵');
@@ -516,13 +538,13 @@ function renderTasks(){
     }
     var actions='<div class="task-actions">';
     if(!isDone&&!isProgress){
-      actions+='<button class="abtn abtn-start" onclick="updateStatus(\''+t.id+'\',\'בביצוע\',this)">▶ התחל</button>';
-      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+      actions+='<button class="abtn abtn-start" onclick="updateStatus(\''+t.id+'\',ST.PROGRESS,this)">▶ התחל</button>';
+      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',ST.DONE,this)">✓ סיימתי</button>';
     }else if(isProgress){
-      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ חזרה</button>';
-      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',ST.OPEN,this)">↩ חזרה</button>';
+      actions+='<button class="abtn abtn-done-solid" onclick="updateStatus(\''+t.id+'\',ST.DONE,this)">✓ סיימתי</button>';
     }else{
-      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתח מחדש</button>';
+      actions+='<button class="abtn abtn-open" onclick="updateStatus(\''+t.id+'\',ST.OPEN,this)">↩ פתח מחדש</button>';
     }
     actions+='</div>';
     return '<div class="task-card '+pc+(isDone?' done':'')+' entering" style="animation-delay:'+Math.min(i*.04,.3)+'s">'+
@@ -545,8 +567,8 @@ function renderTasks(){
 //  RENDER — KANBAN VIEW
 // ═══════════════════════════
 function renderKanban(){
-  var statuses=['פתוח','בביצוע','הושלם'];
-  var countIds={פתוח:'kc-open',בביצוע:'kc-prog',הושלם:'kc-done'};
+  var statuses=[ST.OPEN,ST.PROGRESS,ST.DONE];
+  var countIds={};countIds[ST.OPEN]='kc-open';countIds[ST.PROGRESS]='kc-prog';countIds[ST.DONE]='kc-done';
   statuses.forEach(function(status){
     var zone=document.getElementById('kdrop-'+status);
     if(!zone)return;
@@ -556,17 +578,17 @@ function renderKanban(){
     if(tasks.length===0){var kIcons={פתוח:'📭',בביצוע:'⏸️',הושלם:'🏁'};var kLabels={פתוח:'אין משימות פתוחות',בביצוע:'אין משימות בביצוע',הושלם:'אין משימות שהושלמו'};zone.innerHTML='<div style="text-align:center;padding:32px 12px"><div style="font-size:28px;margin-bottom:8px">'+(kIcons[status]||'📋')+'</div><div style="font-size:12px;color:var(--gt);font-weight:600">'+(kLabels[status]||'אין משימות')+'</div></div>';return;}
     var pc2=priorityClass, bc2=bdgClass;
     zone.innerHTML=tasks.map(function(t){
-      var isDone=t.status==='הושלם', isProgress=t.status==='בביצוע';
+      var isDone=t.status===ST.DONE, isProgress=t.status===ST.PROGRESS;
       var pc=pc2[t.priority]||'normal', pb=bc2[t.priority]||'bbl';
       var acts='<div class="kcard-actions">';
       if(!isDone&&!isProgress){
-        acts+='<button class="kabtn kabtn-start" onclick="updateStatus(\''+t.id+'\',\'בביצוע\',this)">▶ התחל</button>';
-        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+        acts+='<button class="kabtn kabtn-start" onclick="updateStatus(\''+t.id+'\',ST.PROGRESS,this)">▶ התחל</button>';
+        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',ST.DONE,this)">✓ סיימתי</button>';
       }else if(isProgress){
-        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתוח</button>';
-        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',\'הושלם\',this)">✓ סיימתי</button>';
+        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',ST.OPEN,this)">↩ פתוח</button>';
+        acts+='<button class="kabtn kabtn-done" onclick="updateStatus(\''+t.id+'\',ST.DONE,this)">✓ סיימתי</button>';
       }else{
-        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',\'פתוח\',this)">↩ פתח</button>';
+        acts+='<button class="kabtn kabtn-open" onclick="updateStatus(\''+t.id+'\',ST.OPEN,this)">↩ פתח</button>';
       }
       acts+='</div>';
       var fs='';
@@ -582,23 +604,29 @@ function renderKanban(){
 // ═══════════════════════════
 //  DRAG & DROP
 // ═══════════════════════════
+var _dropInProgress=false;
 function onDragStart(e){dragTaskId=e.currentTarget.dataset.id;e.currentTarget.classList.add('dragging');e.dataTransfer.effectAllowed='move';}
 function onDragEnd(e){e.currentTarget.classList.remove('dragging');document.querySelectorAll('.kanban-drop-zone').forEach(function(z){z.classList.remove('drag-over');});}
 function onDragOver(e){e.preventDefault();e.dataTransfer.dropEffect='move';e.currentTarget.classList.add('drag-over');}
 function onDragLeave(e){e.currentTarget.classList.remove('drag-over');}
 function onDrop(e){
   e.preventDefault();e.currentTarget.classList.remove('drag-over');
+  if(_dropInProgress)return;
   var newStatus=e.currentTarget.dataset.status;
   if(!dragTaskId||!newStatus)return;
   var task=allTasks.find(function(t){return t.id===dragTaskId;});
   if(!task||task.status===newStatus){dragTaskId=null;return;}
+  var prevStatus=task.status;
+  _dropInProgress=true;
   task.status=newStatus; // optimistic
   updateStats();renderKanban();
-  sb.from('tasks').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',dragTaskId).then(function(r){
-    if(r.error){toast('שגיאה בעדכון','error');loadTasks();}
-    else{toast('סטטוס עודכן','success',1800);loadTasks();}
-    dragTaskId=null;
-  });
+  var dropId=dragTaskId;
+  dragTaskId=null;
+  sb.from('tasks').update({status:newStatus,updated_at:new Date().toISOString()}).eq('id',dropId).then(function(r){
+    _dropInProgress=false;
+    if(r.error){task.status=prevStatus;updateStats();renderKanban();toast('שגיאה בעדכון','error');}
+    else{toast('סטטוס עודכן','success',1800);loadTasksDebounced();}
+  }).catch(function(){_dropInProgress=false;task.status=prevStatus;updateStats();renderKanban();toast('שגיאת רשת בעדכון','error');});
 }
 
 // ═══════════════════════════
@@ -626,12 +654,14 @@ function filterEmp(filter,btn){
 // ═══════════════════════════
 function showErr(msg){
   var b=document.getElementById('err-banner');
-  document.getElementById('err-banner-msg').textContent=msg;
+  var bm=document.getElementById('err-banner-msg');
+  if(!b||!bm)return;
+  bm.textContent=msg;
   b.classList.add('show');
 }
 
 function doLogout(){
-  sb.auth.signOut().then(function(){window.location.href='login.html';});
+  sb.auth.signOut().then(function(){window.location.href='login.html';}).catch(function(){window.location.href='login.html';});
 }
 
 // ══════════════════════════════════════════
@@ -651,7 +681,7 @@ function openEmployeeAgent(){
   sb.from('employees').select('role_id').eq('id',EMP_ID).maybeSingle().then(function(r){
     var roleId=r.data&&r.data.role_id;
     if(!roleId){
-      alert('לא שויכת לתפקיד עדיין — פנה למנהל.');
+      toast('לא שויכת לתפקיד עדיין — פנה למנהל שלך','warning');
       document.getElementById('tab-tasks').click();
       return;
     }
@@ -664,6 +694,10 @@ function openEmployeeAgent(){
 // ══════════════════════════════════════════
 //  ROLE AGENT — הסוכן שלי
 // ══════════════════════════════════════════
+// debounce: מונע ריבוי fetches כשמגיעים כמה realtime events ברצף
+var _loadTasksTimer=null;
+function loadTasksDebounced(){clearTimeout(_loadTasksTimer);_loadTasksTimer=setTimeout(loadTasks,300);}
+
 var WORKER_URL='https://agent7-rules.shvirooren.workers.dev';
 var roleAgent=null, roleProfile=null, roleMemory=[], roleConvId=null, roleConvHistory=[], roleLoading=false, roleAgentLoaded=false;
 
@@ -672,6 +706,11 @@ function loadRoleAgent(){
   roleAgentLoaded=true;
   // טוען עובד עם תפקיד
   sb.from('employees').select('*, job_roles(*)').eq('id',EMP_ID).maybeSingle().then(function(r){
+    if(r.error){
+      roleAgentLoaded=false;  // מאפשר retry בפעם הבאה
+      toast('שגיאה בטעינת הסוכן — נסה שוב','error');
+      return;
+    }
     var emp=r.data;
     if(!emp||!emp.role_id||!emp.job_roles){
       document.getElementById('agent-panel-sub').textContent='לא שויך לתפקיד';
@@ -695,6 +734,9 @@ function loadRoleAgent(){
         });
       }
     });
+  }).catch(function(){
+    roleAgentLoaded=false;  // מאפשר retry בפעם הבאה
+    toast('שגיאת רשת בטעינת הסוכן — נסה שוב','error');
   });
 }
 
@@ -711,8 +753,8 @@ async function sendRoleMessage(){
   addChatMsg('user',msg);
   roleConvHistory.push({role:'user',content:msg});
 
-  // שמור ל-DB
-  if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'user',content:msg}).then(function(r){if(r.error)toast('שגיאה בשמירת הודעה','error');});
+  // שמור ל-DB (שגיאה לא קריטית — השיחה ממשיכה בכל מקרה)
+  if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'user',content:msg}).then(function(r){if(r.error)console.warn('שגיאה בשמירת הודעה:',r.error.message);}).catch(function(){});
 
   showTyping(true);
   document.getElementById('agent-send-btn').disabled=true;
@@ -767,7 +809,7 @@ async function sendRoleMessage(){
     addChatMsg('assistant',reply);
     if(data.action&&data.action.type==='create_pdf') addPdfDownloadBtn(data.action.data);
     if(data.db_action) showDbActionConfirm(data.db_action);
-    if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'assistant',content:reply}).then(function(r){if(r.error)console.warn('שגיאה בשמירת תשובה:',r.error.message);});
+    if(roleConvId)sb.from('role_messages').insert({conversation_id:roleConvId,role:'assistant',content:reply}).then(function(r){if(r.error)console.warn('שגיאה בשמירת תשובה:',r.error.message);}).catch(function(){});
     }).catch(function(){
       showTyping(false);
       addChatMsg('assistant','מצטערת, הייתה שגיאה. אנא נסה שוב.');
@@ -791,7 +833,7 @@ async function sendRoleMessage(){
       }).catch(function(){return[];});
     Promise.all([pinned,semantic]).then(function(res){
       var base=res[0].data||[];
-      var found=res[1];
+      var found=Array.isArray(res[1])?res[1]:[];
       var baseIds=new Set(base.map(function(m){return m.id;}));
       doChat(base.concat(found.filter(function(m){return !baseIds.has(m.id);})));
     }).catch(function(){doChat([]);});

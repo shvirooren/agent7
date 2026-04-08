@@ -172,13 +172,13 @@ function setLoading(btnId, loading) {
 
 // ── Route by role ──
 function routeByRole(uid) {
-  sb.from('user_roles').select('role').eq('user_id', uid).single().then(function(r) {
+  sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
     if (r.error || !r.data) {
       // no role yet — check employee_users
-      sb.from('employee_users').select('employee_id').eq('user_id', uid).single().then(function(er){
+      sb.from('employee_users').select('employee_id').eq('auth_user_id', uid).single().then(function(er){
         if (er.data && er.data.employee_id) window.location.href = 'employee.html';
         else window.location.href = 'dashboard.html'; // fallback
-      });
+      }).catch(function() { window.location.href = 'dashboard.html'; });
       return;
     }
     if (r.data.role === 'manager') {
@@ -186,6 +186,9 @@ function routeByRole(uid) {
     } else {
       window.location.href = 'employee.html';
     }
+  }).catch(function() {
+    showMsg('שגיאת רשת — נסה שוב', 'err');
+    setLoading('login-btn', false);
   });
 }
 
@@ -209,7 +212,7 @@ function doLogin() {
     }
     var uid = res.data.user.id;
     // detect role, show indicator, then route — all from same query result
-    sb.from('user_roles').select('role').eq('user_id', uid).single().then(function(r) {
+    sb.from('user_roles').select('role').eq('auth_user_id', uid).single().then(function(r) {
       var role = r.data ? r.data.role : null;
       var pill = document.getElementById('role-pill');
       pill.style.display = 'flex';
@@ -223,7 +226,7 @@ function doLogin() {
         setTimeout(function() { window.location.href = 'employee.html'; }, 900);
       } else {
         // no role in user_roles — check employee_users
-        sb.from('employee_users').select('employee_id').eq('user_id', uid).single().then(function(er) {
+        sb.from('employee_users').select('employee_id').eq('auth_user_id', uid).single().then(function(er) {
           pill.style.display = 'flex';
           if (er.data && er.data.employee_id) {
             pill.className = 'role-pill employee';
@@ -234,9 +237,18 @@ function doLogin() {
             pill.innerHTML = '🏢 מעביר לדשבורד...';
             setTimeout(function() { window.location.href = 'dashboard.html'; }, 900);
           }
+        }).catch(function() {
+          setLoading('login-btn', false);
+          showMsg('שגיאת רשת — נסה שוב', 'err');
         });
       }
+    }).catch(function() {
+      setLoading('login-btn', false);
+      showMsg('שגיאת רשת — נסה שוב', 'err');
     });
+  }).catch(function() {
+    setLoading('login-btn', false);
+    showMsg('שגיאת רשת — נסה שוב', 'err');
   });
 }
 
